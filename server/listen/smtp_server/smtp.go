@@ -4,8 +4,8 @@ import (
 	"crypto/tls"
 	"time"
 
-	"github.com/ffyuhf/pmail/config"
 	"github.com/emersion/go-smtp"
+	"github.com/ffyuhf/pmail/config"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -20,8 +20,9 @@ func StartWithTLSNew() {
 
 	instanceTlsNew.Addr = ":587"
 	instanceTlsNew.Domain = config.Instance.Domain
-	instanceTlsNew.ReadTimeout = 10 * time.Second
-	instanceTlsNew.WriteTimeout = 10 * time.Second
+	// 修复：将超时从10秒增加到60秒，避免大HTML邮件传输超时被中断
+	instanceTlsNew.ReadTimeout = 60 * time.Second
+	instanceTlsNew.WriteTimeout = 60 * time.Second
 	instanceTlsNew.MaxMessageBytes = 1024 * 1024 * 30
 	instanceTlsNew.MaxRecipients = 50
 	// 强制 TLS 认证：拒绝未加密连接上的认证
@@ -49,8 +50,9 @@ func StartWithTLS() {
 
 	instanceTls.Addr = ":465"
 	instanceTls.Domain = config.Instance.Domain
-	instanceTls.ReadTimeout = 10 * time.Second
-	instanceTls.WriteTimeout = 10 * time.Second
+	// 修复：将超时从10秒增加到60秒，避免大HTML邮件传输超时被中断
+	instanceTls.ReadTimeout = 60 * time.Second
+	instanceTls.WriteTimeout = 60 * time.Second
 	instanceTls.MaxMessageBytes = 1024 * 1024 * 30
 	instanceTls.MaxRecipients = 50
 	// 强制 TLS 认证：拒绝未加密连接上的认证
@@ -77,8 +79,9 @@ func Start() {
 
 	instance.Addr = ":25"
 	instance.Domain = config.Instance.Domain
-	instance.ReadTimeout = 10 * time.Second
-	instance.WriteTimeout = 10 * time.Second
+	// 修复：将超时从10秒增加到60秒，避免大HTML邮件传输超时被中断
+	instance.ReadTimeout = 60 * time.Second
+	instance.WriteTimeout = 60 * time.Second
 	instance.MaxMessageBytes = 1024 * 1024 * 30
 	instance.MaxRecipients = 50
 	// 强制 TLS 认证

@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ffyuhf/pmail/config"
-	"github.com/ffyuhf/pmail/models"
-	"github.com/ffyuhf/pmail/utils/context"
 	"github.com/emersion/go-message"
 	_ "github.com/emersion/go-message/charset"
 	"github.com/emersion/go-message/mail"
+	"github.com/ffyuhf/pmail/config"
+	"github.com/ffyuhf/pmail/models"
+	"github.com/ffyuhf/pmail/utils/context"
 	"github.com/microcosm-cc/bluemonday"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
@@ -122,6 +122,19 @@ func init() {
 
 	relaxedPolicy.AllowElements("style")
 	relaxedPolicy.AllowAttrs("type").OnElements("style")
+
+	// 邮件中常见的语义化和格式化 HTML 元素
+	// 修复：扩展允许的元素列表，避免复杂 HTML 邮件结构被过度剥离
+	relaxedPolicy.AllowElements("section", "article", "header", "footer", "main", "nav")
+	relaxedPolicy.AllowElements("aside", "figure", "figcaption")
+	relaxedPolicy.AllowElements("hr", "pre", "code", "mark", "time", "wbr")
+	relaxedPolicy.AllowElements("abbr", "address", "cite", "q")
+	relaxedPolicy.AllowElements("ins", "del", "s", "sub", "sup")
+	relaxedPolicy.AllowElements("dl", "dt", "dd")
+	relaxedPolicy.AllowElements("details", "summary")
+	relaxedPolicy.AllowAttrs("cite").OnElements("blockquote", "q", "ins", "del")
+	relaxedPolicy.AllowAttrs("datetime").OnElements("time", "ins", "del")
+	relaxedPolicy.AllowAttrs("title").Globally()
 
 	relaxedPolicy.AllowURLSchemes("http", "https", "mailto")
 
@@ -299,13 +312,12 @@ func formatContent(entity *message.Entity, ret *Email) error {
 	case "text/html":
 		htmlContent, _ := io.ReadAll(entity.Body)
 		ret.HTML = []byte(relaxedPolicy.Sanitize(string(htmlContent)))
+	// multipart/related 的子节点由外层 Walk 自然遍历处理
+	// 修复：移除内层 entity.Walk() 调用，避免双重遍历导致 Body 被消耗后覆盖为空内容
+	// 原因：外层 m.Walk() 会遍历到 multipart/related 的每个子节点（text/html, image/png 等），
+	// 如果在这里再调用 entity.Walk()，同一个实体的 Body 会被读取两次，
+	// 第二次读取时 io.ReadAll(entity.Body) 返回空内容，覆盖了第一次正确读取的 HTML
 	case "multipart/related":
-		entity.Walk(func(path []int, entity *message.Entity, err error) error {
-			if t, _, _ := entity.Header.ContentType(); t == "multipart/related" {
-				return nil
-			}
-			return formatContent(entity, ret)
-		})
 	default:
 		c, _ := io.ReadAll(entity.Body)
 		fileName := p["name"]
@@ -445,7 +457,9 @@ func (e *Email) ForwardBuildBytes(ctx *context.Context, sender *models.User) []b
 		log.WithContext(ctx).Fatal(err)
 	}
 	var th mail.InlineHeader
-	th.Set("Content-Type", "text/plain")
+	th.Set("Content-Type", "text/plain; charset=UTF-8")
+	// 修复：统一设置 Content-Transfer-Encoding，与 BuildBytes 保持一致
+	th.Header.Set("Content-Transfer-Encoding", "base64")
 	w, err := tw.CreatePart(th)
 	if err != nil {
 		log.Fatal(err)
@@ -454,7 +468,9 @@ func (e *Email) ForwardBuildBytes(ctx *context.Context, sender *models.User) []b
 	w.Close()
 
 	var html mail.InlineHeader
-	html.Set("Content-Type", "text/html")
+	html.Set("Content-Type", "text/html; charset=UTF-8")
+	// 修复：统一设置 Content-Transfer-Encoding，与 BuildBytes 保持一致
+	html.Header.Set("Content-Transfer-Encoding", "base64")
 	w, err = tw.CreatePart(html)
 	if err != nil {
 		log.Fatal(err)
