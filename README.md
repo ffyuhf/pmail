@@ -1,18 +1,16 @@
-# [PMail](https://github.com/jinnrry/pmail/)
+# PMail
 
-> 拷贝项目地址:[https://github.com/jinnrry/pmail/](https://github.com/jinnrry/pmail/)
+> 拷贝项目地址：[https://github.com/jinnrry/pmail/](https://github.com/jinnrry/pmail/)
 
 > 一台服务器、一个域名、一行代码、一分钟时间，你就能够搭建出一个自己的域名邮箱。
 
 PMail是一个追求极简部署流程、极致资源占用的个人域名邮箱服务器。单文件运行，包含完整的收发邮件服务和Web端邮件管理功能。只需一台服务器、一个域名、一行代码、一分钟部署时间，你就能够搭建出自己的域名邮箱。
 
-欢迎各类PR，无论你是修复bug、新增功能、修改翻译。另外，也为这个项目征集一个漂亮可爱的Logo！
+欢迎各类PR，无论你是修复bug、新增功能、修改翻译。
 
-## 为什么写这个项目
+## 为什么拷贝这个项目
 
-迫于越来越多的邮件服务商暂停了针对个人的域名邮箱服务（比如QQ邮箱、微软Outlook邮箱），因此考虑自建域名邮箱服务。
-但是自建域名邮箱可选的程序并不多，且目标都不是针对个人使用场景设计的。个人服务器一般内存、CPU、硬盘配置都不高，针对公司场景使用的邮箱程序过于臃肿，
-白白浪费资源。就拿我自己的服务器来说，我服务器配置为1核512M 10G硬盘，市面上绝大多数邮箱服务器安装上就把磁盘占满了，根本没法正常使用
+jinnrry作者更的太慢了，功能对我来说太少了
 
 ## 项目优势
 
@@ -22,14 +20,17 @@ PMail是一个追求极简部署流程、极致资源占用的个人域名邮箱
 
 ### 2、资源占用极小
 
-编译后二进制文件仅18MB，运行过程中占用内存24M以内。
+编译后二进制文件仅18MB，运行过程中占用内存28M以内。
 
 ### 3、安全方面
 
-支持dkim、spf校验。正确配置的情况下，Email Test得分10分。
+支持DKIM、SPF校验。正确配置的情况下，Email Test得分10分。
+
+> ###### 正确配置包括但不限于：一个正常的顶级域名后戳，一个有固定的IP地址（支持rDNS）的服务器
 
 **认证与密码安全：**
-- 密码采用 bcrypt 安全哈希存储，替代传统弱哈希算法，支持渐进式自动迁移
+
+- 密码采用 bcrypt （10）安全哈希存储，替代传统弱哈希算法，支持渐进式自动迁移
 - 全协议暴力破解防护（HTTP/SMTP/IMAP/POP3），基于IP和账户的指数退避频率限制
 - API Token 采用随机不透明令牌（Opaque Token），支持撤销和客户端IP绑定
 
@@ -47,18 +48,30 @@ PMail是一个追求极简部署流程、极致资源占用的个人域名邮箱
 - DKIM 使用 2048 位 RSA 密钥签名，满足现代安全标准
 - 配置文件、SSL 私钥、DKIM 密钥等敏感文件采用最小权限（0600/0400/0644）
 
-### 4、自动SSL证书
+### 4、HTML 邮件兼容性
+
+修复 `multipart/related` 双重遍历 Bug，HTML 邮件不再显示为纯文本。扩展 XSS 安全策略，支持 HTML5 语义元素（section/article/header 等），同时仍阻止 script/iframe/object 等危险标签。修复大 HTML 邮件因 SMTP 超时被中断的问题（超时从 10s 增加到 60s），转发邮件自动添加正确的编码头。修复邮件标题和发件人名称中 HTML 实体编码（如 `&#39;`）显示异常的问题。
+
+### 5、前端体验
+
+- 邮件搜索：侧边栏搜索框支持关键词搜索，回车触发、一键清空
+- 批量操作：列表全选/取消全选（含半选状态）、每页条数选择器（15/25/50/100）
+- 编辑器全屏：全屏模式覆盖整个写信界面（收件人、主题、附件等），而非仅编辑区
+- 视觉统一：采用 Docusaurus BEM 风格 CSS 变量体系，暗色模式下颜色一致
+- 布局自适应：列表行宽度按屏幕自适应，窄屏自动隐藏摘要列
+
+### 6、自动SSL证书
 
 实现了ACME协议，程序将自动获取并更新Let's Encrypt证书。
 
 默认情况下，会为web后台也生成ssl证书，让后台使用https访问，如果你有自己的网关层，不需要https的话，在配置文件中将 `httpsEnabled`
 设置为 `2`，这样管理后台就不会使用https协议。（ 注意：即使你不需要https，也请保证ssl证书文件路径正确，http协议虽然不使用证书了，但是smtp协议还需要证书）
 
-### 5、邮件客户端支持
+### 7、邮件客户端支持
 
 只要支持pop3、smtp、imap协议的邮件客户端均可使用
 
-### 6、多域名、多用户支持
+### 8、多域名、多用户支持
 
 支持多域名、多用户且完整支持收发邮件
 
@@ -91,7 +104,17 @@ PMail是一个追求极简部署流程、极致资源占用的个人域名邮箱
 
 ## 3、配置
 
-浏览器打开 `http://127.0.0.1` 或者是用你服务器公网IP访问，然后按提示配置
+为安全考虑，程序启动后会在日志中打印 Setup URL（含 Token 参数），例如：
+
+```
+Please click http://YOUR_IP/?token=xxxxxxxx to continue.
+```
+
+- **直接运行**：查看终端输出的启动日志，点击或复制其中的 URL 到浏览器打开
+- **Docker 运行**：通过 `docker logs <容器ID>` 查看启动日志获取 URL
+
+> [!IMPORTANT]
+> Setup Token 为一次性鉴权凭据，用于保护初始化接口安全。必须通过启动日志中带 `?token=xxx` 参数的 URL 访问配置页面，直接访问 `http://IP` 将被拒绝。
 
 ## 4、邮箱得分测试
 
@@ -99,24 +122,58 @@ PMail是一个追求极简部署流程、极致资源占用的个人域名邮箱
 
 # 配置文件说明
 
+配置文件位于 `config/config.json`，首次运行时自动生成。通常通过 Setup 向导自动配置，也可手动编辑。
+
 ```jsonc
 {
-  "logLevel": "info", // 日志输出级别（debug/info/warn/error）
-  "domain": "domain.com", // 你的域名
-  "webDomain": "mail.domain.com", // web域名
-  "dkimPrivateKeyPath": "config/dkim/dkim.priv", // dkim 私钥地址
-  "sslType": "0", // ssl证书更新模式，0自动，HTTP模式，1手动、2自动，DNS模式
-  "SSLPrivateKeyPath": "config/ssl/private.key", // ssl 证书地址
-  "SSLPublicKeyPath": "config/ssl/public.crt", // ssl 证书地址
-  "dbDSN": "./config/pmail.db", // 数据库连接DSN
-  "dbType": "sqlite", //数据库类型，支持sqlite 和 mysql
-  "httpsEnabled": 0, // web后台是否启用https 0默认（启用），1启用，2不启用
-  "spamFilterLevel": 0,// 垃圾邮件过滤级别，0不过滤、1 spf dkim 校验均失败时且无有效收件人过滤，2 spf校验不通过时且无有效收件人过滤 3,dkim 校验不过的时候且无有效收件人过滤
-  "httpPort": 80, // http 端口 . 默认 80
-  "httpsPort": 443, // https 端口 . 默认 443
-  "isInit": true // 为false的时候会进入安装引导流程 
+  // ===== 基础设置 =====
+  "logLevel": "info",              // 日志级别：debug / info / warn / error
+  "domain": "domain.com",          // 主域名
+  "domains": ["domain.com"],       // 所有收信域名（多域名时填写全部）
+  "webDomain": "mail.domain.com",  // Web 管理后台域名
+
+  // ===== SSL 证书 =====
+  "sslType": "0",                  // 证书模式：0=自动(HTTP挑战) / 1=手动上传 / 2=自动(DNS挑战)
+  "SSLPrivateKeyPath": "config/ssl/private.key",  // SSL 私钥路径
+  "SSLPublicKeyPath": "config/ssl/public.crt",    // SSL 证书路径
+
+  // ===== DKIM 签名 =====
+  "dkimPrivateKeyPath": "config/dkim/dkim.priv",  // DKIM 私钥路径（2048位，自动生成）
+
+  // ===== 数据库 =====
+  "dbType": "sqlite",              // 数据库类型：sqlite / mysql / postgres
+  "dbDSN": "./config/pmail.db",    // SQLite: 文件路径 | MySQL: user:pass@tcp(host:port)/dbname?parseTime=True&loc=Local
+
+  // ===== Web 服务 =====
+  "httpsEnabled": 0,               // HTTPS 开关：0=默认启用 / 1=启用 / 2=不启用（仅 HTTP）
+  "httpPort": 80,                  // HTTP 端口，默认 80
+  "httpsPort": 443,                // HTTPS 端口，默认 443
+
+  // ===== 垃圾邮件过滤「且无有效收件人时过滤」 =====
+  "spamFilterLevel": 0,            // 0=不过滤 / 1=SPF+DKIM 均失败时过滤 / 2=SPF 不通过时过滤 / 3=DKIM 不通过时过滤
+
+  // ===== 消息推送（可选/此处不用可删） =====
+  "weChatPushAppId": "",           // 微信推送 AppID
+  "weChatPushSecret": "",          // 微信推送 Secret
+  "weChatPushTemplateId": "",      // 微信推送模板 ID
+  "weChatPushUserId": "",          // 微信推送用户 ID
+  "tgBotToken": "",                // Telegram Bot Token
+  "tgChatId": "",                  // Telegram Chat ID
+  "webPushUrl": "",                // 自定义 Web Push URL
+  "webPushToken": "",              // 自定义 Web Push Token
+
+  // ===== 系统状态 =====
+  "isInit": true                   // false 时进入安装引导流程，Setup 完成后自动设为 true
 }
 ```
+
+### 数据库 DSN 格式参考
+
+| 数据库类型 | dbDSN 示例 |
+|-----------|-----------|
+| SQLite | `./config/pmail.db` |
+| MySQL | `root:password@tcp(127.0.0.1:3306)/pmail?parseTime=True&loc=Local` |
+| PostgreSQL | `postgres://user:password@localhost:5432/pmail?sslmode=disable` |
 
 # 第三方邮件客户端配置
 
@@ -144,11 +201,59 @@ IMAP端口： 993(SSL)
 
 ## 插件安装
 > [!IMPORTANT]
-> 插件已独立进程的方式运行在你的服务器上，请自行审查第三方插件的安全性。PMail目前仅维护上述三款插件
+> 插件以独立进程的方式运行在你的服务器上，请自行审查第三方插件的安全性。PMail目前仅维护上述三款插件
 
 将插件二进制文件放到`plugins`文件夹中即可
 
 # 参与开发
+
+
+
+## ⚠️ 不兼容变更「对于原版」
+
+### 1. API Token 格式变更
+
+- **旧格式**：`{account}:md5(hash+timestamp):timestamp` — 已不再支持
+- **新格式**：64 字符随机 hex 字符串
+- **迁移方式**：通过 `/api/token/generate` 端点重新生成
+- **影响范围**：仅影响通过 HTTP `Token` Header 调用 API 的外部集成，Web 端 Session 不受影响
+
+### 2. 数据库 Schema 变更
+
+- `user` 表 `password` 字段：`char(32)` → `varchar(72)`（xorm Sync2 自动迁移）
+- 新增 `api_tokens` 表（xorm Sync2 自动创建）
+
+### 3. Setup 访问方式变更
+
+- Setup 页面必须通过启动日志中带 `?token=xxx` 参数的 URL 访问
+- Setup 接口仅接受 POST 请求
+
+## 升级注意事项
+
+### 必须操作
+
+| 操作 | 说明 |
+|------|------|
+| **更新 DNS DKIM 记录** | DKIM 密钥已从 1024 位升级为 2048 位，首次启动自动重新生成，需将新公钥更新到 DNS TXT 记录 |
+| **重新生成 API Token** | 旧格式 Token 已失效，需通过 `/api/token/generate` 重新生成 |
+| **记录 Setup Token** | 首次部署时 Setup URL 携带一次性 Token，从启动日志获取 |
+
+### 自动处理（无需手动操作）
+
+| 项目 | 说明 |
+|------|------|
+| 密码迁移 | 用户登录时自动从 MD5 升级为 bcrypt |
+| 数据库表结构 | xorm Sync2 自动处理字段类型变更和新表创建 |
+| Cookie 属性 | Session Cookie 自动添加 SameSite=Lax |
+
+### 建议操作
+
+| 操作 | 说明 |
+|------|------|
+| 手动修复文件权限 | 对已有配置文件执行 `chmod 600`、SSL 私钥执行 `chmod 400` |
+| 验证邮件客户端 | 确认使用的邮件客户端支持 STARTTLS（现代客户端均支持） |
+
+---
 
 ## 项目架构
 
