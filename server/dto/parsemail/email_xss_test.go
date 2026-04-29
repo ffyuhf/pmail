@@ -174,24 +174,27 @@ func TestBuildUser_XSS(t *testing.T) {
 			shouldBeNil:   false,
 		},
 		{
+			// 修复：2026-04-29 stripHTMLTags 保留原始引号，不编码为 HTML 实体
 			name:          "User with quotes",
 			input:         `"John O'Connor" <john@example.com>`,
 			expectedEmail: "john@example.com",
-			expectedName:  "John O&#39;Connor",
+			expectedName:  "John O'Connor",
 			shouldBeNil:   false,
 		},
 		{
+			// 修复：2026-04-29 stripHTMLTags 保留原始引号，不编码为 HTML 实体
 			name:          "JavaScript in name - should be filtered",
 			input:         `javascript:alert('xss') <js@example.com>`,
 			expectedEmail: "js@example.com",
-			expectedName:  "javascript:alert(&#39;xss&#39;)",
+			expectedName:  "javascript:alert('xss')",
 			shouldBeNil:   false,
 		},
 		{
-			name:          "Event handler in name - quotes removed in sanitization",
+			// 修复：2026-04-29 stripHTMLTags 保留原始引号，不编码为 HTML 实体
+			name:          "Event handler in name - quotes preserved",
 			input:         `onclick="alert('xss')" <click@example.com>`,
 			expectedEmail: "click@example.com",
-			expectedName:  "onclick= alert(&#39;xss&#39;)",
+			expectedName:  "onclick= alert('xss')",
 			shouldBeNil:   false,
 		},
 		{

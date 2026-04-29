@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"mime"
 	"net/textproto"
@@ -139,6 +140,17 @@ func init() {
 	relaxedPolicy.AllowURLSchemes("http", "https", "mailto")
 
 	relaxedPolicy.SkipElementsContent("script", "object", "embed", "iframe", "frame", "frameset")
+}
+
+// stripHTMLTags 剥离所有 HTML 标签并保留原始文本字符。
+// 实现方式：先由 bluemonday.StrictPolicy 完成健壮的 XSS 过滤（剥离标签、属性等），
+// 再通过 html.UnescapeString 将 HTML 实体还原为原始字符（如 &#39; → '）。
+// 适用于邮件标题、发件人名称等纯文本字段。
+// 修复：2026-04-29，原直接使用 strictPolicy.Sanitize() 会导致纯文本中的引号被编码为 HTML 实体，
+// 例如 Ollama's cloud 被错误保存为 Ollama&#39;s cloud
+func stripHTMLTags(text string) string {
+	sanitized := strictPolicy.Sanitize(text)
+	return html.UnescapeString(sanitized)
 }
 
 func sanitizeHTML(htmlContent string) string {
@@ -275,8 +287,10 @@ func NewEmailFromReader(to []string, r io.Reader, size int) *Email {
 		ret.Sender = ret.From
 	}
 
+	// 修复：2026-04-29 使用 stripHTMLTags 替代 strictPolicy.Sanitize
+	// 原因：StrictPolicy 会将 ' 编码为 &#39; 等实体，导致邮件标题在所有客户端中显示异常
 	subject, _ := m.Header.Text("Subject")
-	ret.Subject = strictPolicy.Sanitize(subject)
+	ret.Subject = stripHTMLTags(subject)
 
 	sendTime, err := time.Parse(time.RFC1123Z, m.Header.Get("Date"))
 	if err != nil {
@@ -287,9 +301,10 @@ func NewEmailFromReader(to []string, r io.Reader, size int) *Email {
 		return formatContent(entity, ret)
 	})
 
+	// 修复：2026-04-29 使用 stripHTMLTags 替代 strictPolicy.Sanitize，避免发件人信息过度编码
 	if ret.From != nil {
-		ret.From.Name = strictPolicy.Sanitize(ret.From.Name)
-		ret.From.EmailAddress = strictPolicy.Sanitize(ret.From.EmailAddress)
+		ret.From.Name = stripHTMLTags(ret.From.Name)
+		ret.From.EmailAddress = stripHTMLTags(ret.From.EmailAddress)
 	}
 
 	return ret
@@ -307,8 +322,9 @@ func formatContent(entity *message.Entity, ret *Email) error {
 	case "multipart/alternative":
 	case "multipart/mixed":
 	case "text/plain":
+		// 修复：2026-04-29 使用 stripHTMLTags 替代 strictPolicy.Sanitize，避免纯文本过度编码
 		testContent, _ := io.ReadAll(entity.Body)
-		ret.Text = []byte(strictPolicy.Sanitize(string(testContent)))
+		ret.Text = []byte(stripHTMLTags(string(testContent)))
 	case "text/html":
 		htmlContent, _ := io.ReadAll(entity.Body)
 		ret.HTML = []byte(relaxedPolicy.Sanitize(string(htmlContent)))
@@ -368,7 +384,8 @@ func buildUser(str string) *User {
 			if decoded, err := decoder.Decode(name); err == nil {
 				name = decoded
 			}
-			user.Name = strictPolicy.Sanitize(name)
+			// 修复：2026-04-29 使用 stripHTMLTags 替代 strictPolicy.Sanitize
+			user.Name = stripHTMLTags(name)
 		}
 		return user
 	}
@@ -379,14 +396,15 @@ func buildUser(str string) *User {
 		namePart := strings.ReplaceAll(str, matched[0], "")
 		namePart = strings.Trim(strings.TrimSpace(namePart), "\"")
 
+		// 修复：2026-04-29 使用 stripHTMLTags 替代 strictPolicy.Sanitize
 		decoder := mime.WordDecoder{}
 		if decoded, err := decoder.Decode(strings.ReplaceAll(namePart, "\"", "")); err == nil {
-			user.Name = strictPolicy.Sanitize(strings.TrimSpace(decoded))
+			user.Name = stripHTMLTags(strings.TrimSpace(decoded))
 		} else {
-			user.Name = strictPolicy.Sanitize(strings.TrimSpace(namePart))
+			user.Name = stripHTMLTags(strings.TrimSpace(namePart))
 		}
 	} else {
-		user.EmailAddress = strictPolicy.Sanitize(str)
+		user.EmailAddress = stripHTMLTags(str)
 	}
 
 	return user
