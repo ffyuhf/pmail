@@ -5,7 +5,7 @@
   ============================================================ -->
 <template>
   <div class="sidebar">
-    <!-- 搜索框 -->
+    <!-- 搜索框：回车触发搜索，清空时重置搜索结果 -->
     <div class="sidebar__search">
       <el-input
         v-model="searchQuery"
@@ -13,6 +13,8 @@
         prefix-icon="Search"
         clearable
         size="default"
+        @keyup.enter="handleSearch"
+        @clear="handleClearSearch"
       />
     </div>
 
@@ -50,13 +52,15 @@ import { useRouter } from "vue-router";
 import { ref, watch, computed } from "vue";
 import useGroupStore from "../stores/group";
 import lang from "../i18n/i18n";
-import { http } from "@/utils/axios";
+import { groupService } from "@/services/groupService";
 import { Setting } from "@element-plus/icons-vue";
 import { useGlobalStatusStore } from "../stores/useGlobalStatusStore";
+import { useSettingsDrawer } from "@/composables/useSettingsDrawer";
 import type { GroupItem } from "@/types/api";
 
 const groupStore = useGroupStore();
 const globalStatus = useGlobalStatusStore();
+const {openSettings} = useSettingsDrawer();
 const isLogin = computed(() => globalStatus.isLogin);
 const router = useRouter();
 const data = ref<GroupItem[]>([]);
@@ -68,7 +72,8 @@ watch(() => groupStore.tag, (newVal) => {
   activeGroup.value = newVal;
 });
 
-http.get("/api/group").then((res: any) => {
+/** 通过 groupService 获取分组树 */
+groupService.getGroupTree().then((res: any) => {
   if (res.data) {
     const list: GroupItem[] = [];
     const traverse = (items: GroupItem[]) => {
@@ -91,15 +96,17 @@ const handleMenuSelect = function (index: string) {
   }
 };
 
-const openSettings = function () {
-  if (Object.keys(globalStatus.userInfos).length === 0) {
-    globalStatus.init(() => {
-      globalStatus.settingsDrawerVisible = true;
-    });
-  } else {
-    globalStatus.settingsDrawerVisible = true;
-  }
+/** 回车搜索：将关键词同步到 store，触发列表页自动刷新 */
+const handleSearch = function () {
+  groupStore.keyword = searchQuery.value.trim();
 };
+
+/** 清空搜索：重置 store 关键词，恢复完整列表 */
+const handleClearSearch = function () {
+  searchQuery.value = "";
+  groupStore.keyword = "";
+};
+
 </script>
 
 <style scoped>
@@ -165,7 +172,7 @@ const openSettings = function () {
 }
 
 .menu__link:hover {
-  background-color: var(--pm-bg-hover);
+  background-color: var(--ifm-background-hover-color);
   color: var(--ifm-color-content);
   text-decoration: none;
 }

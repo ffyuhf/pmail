@@ -1,23 +1,19 @@
 <template>
-  <div class="settings-card">
-    <div class="settings-header">
-      <h3>{{ lang.auto_rules }}</h3>
-      <p class="settings-desc">{{ lang.auto_rules_desc }}</p>
-    </div>
+  <SettingsCard :title="lang.auto_rules" :description="lang.auto_rules_desc">
 
-    <div class="table-container">
-      <el-table :data="data" class="modern-table" style="width: 100%">
+    <div class="settings__table-container">
+      <el-table :data="data" class="settings__table" style="width: 100%">
         <el-table-column prop="name" :label="lang.rule_name" min-width="150" show-overflow-tooltip/>
         <el-table-column prop="action" :label="lang.rule_do" width="120">
           <template #default="scope">
-            <el-tag size="small" effect="plain" class="action-tag">{{ ActionName[scope.row.action] }}</el-tag>
+            <el-tag size="small" effect="plain" class="settings-tag">{{ ActionName[scope.row.action] }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="params" :label="lang.rule_params" min-width="150" show-overflow-tooltip/>
         <el-table-column prop="sort" :label="lang.rule_priority" width="100"/>
         <el-table-column width="100" align="right">
           <template #default="scope">
-            <div class="row-actions">
+            <div class="settings__row-actions">
               <el-button size="small" type="primary" :icon="Edit" circle text @click="editRule(scope.row)"/>
               <el-popconfirm confirm-button-text="Yes" cancel-button-text="No" :icon="InfoFilled"
                              @confirm="delRule(scope.row.id)" icon-color="#ef4444" :title="lang.del_rule_confirm">
@@ -31,14 +27,14 @@
       </el-table>
     </div>
 
-    <div class="form-actions">
-      <el-button type="primary" @click="dialogVisible = true" class="add-btn">
+    <div class="settings__form-actions">
+      <el-button type="primary" @click="dialogVisible = true" class="settings__btn">
         <el-icon><Plus /></el-icon> {{ lang.new_rule }}
       </el-button>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="addRuleForm.id > 0 ? 'Edit Rule' : lang.new_rule" width="700px" class="premium-dialog">
-      <div class="dialog-content">
+    <el-dialog v-model="dialogVisible" :title="addRuleForm.id > 0 ? 'Edit Rule' : lang.new_rule" width="700px" class="settings__dialog">
+      <div class="settings__dialog-content">
         <el-form :model="addRuleForm" label-position="top">
           <div class="form-row">
             <el-form-item :label="lang.rule_name" class="flex-grow">
@@ -87,7 +83,7 @@
               <el-option key="forward" :label="lang.forward" :value="FORWARD"/>
             </el-select>
             
-            <el-select v-if="addRuleForm.action === 4" v-model="addRuleForm.params" @click="reflushGroupInfos" placeholder="Select Folder" class="flex-grow">
+            <el-select v-if="addRuleForm.action === 4" v-model="addRuleForm.params" @click="refreshGroupInfos" placeholder="Select Folder" class="flex-grow">
               <el-option v-for="gp in groupData.list" :key="gp.id" :label="gp.name" :value="gp.id"/>
             </el-select>
 
@@ -104,15 +100,17 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </SettingsCard>
 </template>
 
 <script setup lang="ts">
 import {reactive, ref} from 'vue';
 import lang from '../i18n/i18n';
 import {Delete, Edit, InfoFilled, Plus} from '@element-plus/icons-vue'
-import {http} from "@/utils/axios";
+import {ruleService} from "@/services/ruleService";
+import {groupService} from "@/services/groupService";
 import {ElNotification} from "element-plus";
+import SettingsCard from "@/components/settings/SettingsCard.vue";
 
 const data = ref<any[]>([])
 const dialogVisible = ref(false)
@@ -128,8 +126,9 @@ const ActionName: Record<number, string> = {
   4: lang.move
 }
 
+/** 通过 ruleService 获取规则列表 */
 const init = function () {
-  http.post("/api/rule/get").then((res: any) => {
+  ruleService.getRules().then((res: any) => {
     data.value = res.data || []
   })
 }
@@ -142,8 +141,9 @@ const groupData = reactive<{
   list: []
 })
 
-const reflushGroupInfos = function () {
-  http.get('/api/group/list').then((res: any) => {
+/** 通过 groupService 获取分组平铺列表 */
+const refreshGroupInfos = function () {
+  groupService.getGroupList().then((res: any) => {
     if (res.data != null) {
       groupData.list = res.data
       for (let i = 0; i < groupData.list.length; i++) {
@@ -153,7 +153,7 @@ const reflushGroupInfos = function () {
   })
 }
 
-reflushGroupInfos()
+refreshGroupInfos()
 
 const addRuleForm = reactive<{
   id: number;
@@ -171,8 +171,9 @@ const addRuleForm = reactive<{
   "params": ""
 })
 
+/** 通过 ruleService 删除规则 */
 const delRule = function (id: number) {
-  http.post("/api/rule/del", {"id": id}).then((res: any) => {
+  ruleService.deleteRule(id).then((res: any) => {
     ElNotification({
       title: res.errorNo === 0 ? lang.succ : lang.fail,
       message: res.data,
@@ -200,15 +201,15 @@ const addRule = function () {
   addRuleForm.rules.push({"field": "", "type": "", "rule": ""})
 }
 
+/** 通过 ruleService 新增或更新规则 */
 const submitRule = function () {
-  let api = "/api/rule/add"
-  if (addRuleForm.id > 0) {
-    api = "/api/rule/update"
-  }
-
   addRuleForm.sort = parseInt(String(addRuleForm.sort))
 
-  http.post(api, addRuleForm).then((res: any) => {
+  const request = addRuleForm.id > 0
+    ? ruleService.updateRule(addRuleForm as any)
+    : ruleService.addRule(addRuleForm as any);
+
+  request.then((res: any) => {
     if (res.errorNo !== 0) {
       ElNotification({
         title: lang.fail,
@@ -234,75 +235,10 @@ const ruleTypeChange = function () {
 </script>
 
 <style scoped>
-.settings-card {
-  padding: 0;
-}
+/* 引入设置组件公共样式（table-container、dialog、form-actions 等） */
+@import '@/assets/settings-common.css';
 
-.settings-header {
-  margin-bottom: 24px;
-}
-
-.settings-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--pm-text-primary);
-  margin: 0 0 8px 0;
-}
-
-.settings-desc {
-  font-size: 14px;
-  color: var(--pm-text-secondary);
-  margin: 0;
-}
-
-.table-container {
-  border: 1px solid var(--pm-border-color);
-  border-radius: var(--pm-radius-sm);
-  overflow: hidden;
-  margin-bottom: 24px;
-}
-
-.modern-table :deep(th.el-table__cell) {
-  background-color: var(--pm-bg-secondary);
-  color: var(--pm-text-secondary);
-  font-weight: 600;
-}
-
-.action-tag {
-  border-radius: var(--pm-radius-sm);
-}
-
-.row-actions {
-  display: flex;
-  justify-content: flex-end;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.modern-table :deep(tr:hover) .row-actions {
-  opacity: 1;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-start;
-}
-
-.add-btn {
-  border-radius: var(--pm-radius-sm);
-}
-
-/* Dialog Styles */
-.premium-dialog :deep(.el-dialog__header) {
-  border-bottom: 1px solid var(--pm-border-color);
-  padding-bottom: 16px;
-  margin-bottom: 20px;
-}
-
-.dialog-content {
-  padding: 0 8px;
-}
-
+/* 规则编辑器独有样式 */
 .form-row {
   display: flex;
   gap: 16px;
@@ -323,7 +259,7 @@ const ruleTypeChange = function () {
 .section-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--pm-text-primary);
+  color: var(--ifm-color-content);
   margin-bottom: 16px;
 }
 
@@ -352,6 +288,6 @@ const ruleTypeChange = function () {
 
 .custom-divider {
   margin: 24px 0;
-  border-color: var(--pm-border-color);
+  border-color: var(--ifm-border-color);
 }
 </style>

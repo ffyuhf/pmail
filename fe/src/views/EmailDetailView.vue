@@ -1,65 +1,66 @@
 <template>
-  <div class="mail-detail-container">
-    <div class="mail-detail-header">
-      <el-button @click="$router.back()" plain class="back-btn">
+  <!-- 邮件详情视图（Docusaurus BEM 风格） -->
+  <div class="mail-detail">
+    <div class="mail-detail__header">
+      <el-button @click="$router.back()" plain class="mail-detail__back-btn">
         <el-icon><Back /></el-icon>
       </el-button>
-      <div class="action-buttons">
+      <div class="mail-detail__actions">
         <el-button plain @click="handleDelete">
           <el-icon><Delete /></el-icon>
         </el-button>
       </div>
     </div>
 
-    <div class="mail-detail-content">
-      <h1 class="mail-subject">{{ detailData.subject }}</h1>
-      
-      <div class="mail-meta-card">
-        <div class="meta-left">
-          <div class="avatar-placeholder">
+    <div class="mail-detail__content">
+      <h1 class="mail-detail__subject">{{ detailData.subject }}</h1>
+
+      <div class="mail-detail__meta-card">
+        <div class="mail-detail__meta-left">
+          <div class="mail-detail__avatar">
             {{ getInitial(detailData.from_name || detailData.from_address) }}
           </div>
-          <div class="meta-info">
-            <div class="sender-line">
-              <span class="sender-name">{{ detailData.from_name !== '' ? detailData.from_name : detailData.from_address }}</span>
-              <span class="sender-email" v-if="detailData.from_name !== ''">&lt;{{ detailData.from_address }}&gt;</span>
+          <div class="mail-detail__meta-info">
+            <div class="mail-detail__sender-line">
+              <span class="mail-detail__sender-name">{{ detailData.from_name !== '' ? detailData.from_name : detailData.from_address }}</span>
+              <span class="mail-detail__sender-email" v-if="detailData.from_name !== ''"><{{ detailData.from_address }}></span>
             </div>
-            <div class="receivers-line">
-              <span class="meta-label">{{ lang.to }}:</span>
-              <span v-for="(to, index) in tos" :key="index" class="receiver-chip">
+            <div class="mail-detail__receivers-line">
+              <span class="mail-detail__meta-label">{{ lang.to }}:</span>
+              <span v-for="(to, index) in tos" :key="index" class="mail-detail__receiver-chip">
                 {{ to.Name !== '' ? to.Name : to.EmailAddress }}<span v-if="index < tos.length - 1">, </span>
               </span>
-              <span v-if="showCC" class="cc-section">
-                <span class="meta-label">{{ lang.cc }}:</span>
-                <span v-for="(item, index) in ccs" :key="'cc'+index" class="receiver-chip">
+              <span v-if="showCC" class="mail-detail__cc-section">
+                <span class="mail-detail__meta-label">{{ lang.cc }}:</span>
+                <span v-for="(item, index) in ccs" :key="'cc'+index" class="mail-detail__receiver-chip">
                   {{ item.Name !== '' ? item.Name : item.EmailAddress }}<span v-if="index < ccs.length - 1">, </span>
                 </span>
               </span>
             </div>
           </div>
         </div>
-        <div class="meta-right">
-          <div class="mail-date">{{ formatDetailDate(detailData.send_date) }}</div>
+        <div class="mail-detail__meta-right">
+          <div class="mail-detail__date">{{ formatDetailDate(detailData.send_date) }}</div>
         </div>
       </div>
 
-      <el-divider class="custom-divider"/>
+      <el-divider class="mail-detail__divider"/>
 
-      <div class="mail-body">
-        <div class="body-text" v-if="detailData.html === ''">
+      <div class="mail-detail__body">
+        <div class="mail-detail__body-text" v-if="detailData.html === ''">
           {{ detailData.text }}
         </div>
-        <div class="body-html" v-else v-html="detailData.html"></div>
+        <div class="mail-detail__body-html" v-else v-html="detailData.html"></div>
       </div>
 
-      <div v-if="detailData.attachments && detailData.attachments.length > 0" class="attachments-section">
-        <el-divider class="custom-divider"/>
-        <div class="attachments-title">{{ lang.attachment }} ({{ detailData.attachments.length }})</div>
-        <div class="attachments-list">
-          <a class="attachment-card" v-for="item in detailData.attachments" :key="item.Index" :href="'/attachments/download/' + detailData.id + '/' + item.Index">
-            <div class="att-icon"><el-icon><Document/></el-icon></div>
-            <div class="att-name">{{ item.Filename }}</div>
-            <div class="att-download"><el-icon><Download/></el-icon></div>
+      <div v-if="detailData.attachments && detailData.attachments.length > 0" class="mail-detail__attachments">
+        <el-divider class="mail-detail__divider"/>
+        <div class="mail-detail__attachments-title">{{ lang.attachment }} ({{ detailData.attachments.length }})</div>
+        <div class="mail-detail__attachments-list">
+          <a class="mail-detail__attachment-card" v-for="item in detailData.attachments" :key="item.Index" :href="'/attachments/download/' + detailData.id + '/' + item.Index">
+            <div class="mail-detail__att-icon"><el-icon><Document/></el-icon></div>
+            <div class="mail-detail__att-name">{{ item.Filename }}</div>
+            <div class="mail-detail__att-download"><el-icon><Download/></el-icon></div>
           </a>
         </div>
       </div>
@@ -73,18 +74,18 @@ import {useRoute, useRouter} from 'vue-router'
 import {Document, Back, Delete, Download} from '@element-plus/icons-vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
 import lang from '../i18n/i18n';
-import {http} from "@/utils/axios";
+import {emailService} from "@/services/emailService";
 import useGroupStore from '../stores/group';
+import {formatDetailDate} from "@/utils/dateFormat";
+import {isTrashGroup} from "@/utils/groupTag";
+import type {EmailDetail, EmailContact, EmailAttachment} from "@/types/api";
 
 const route = useRoute()
 const router = useRouter()
 const groupStore = useGroupStore()
 
-interface EmailContact { Name: string; EmailAddress: string }
-interface Attachment { Index: number; Filename: string }
-
-const detailData = ref<Record<string, any>>({
-  attachments: []
+const detailData = ref<Partial<EmailDetail>>({
+  attachments: [] as EmailAttachment[]
 })
 
 const tos = ref<EmailContact[]>([])
@@ -92,7 +93,8 @@ const ccs = ref<EmailContact[]>([])
 const showCC = ref(false)
 
 const idParam = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id;
-http.post("/api/email/detail", {id: parseInt(idParam)}).then((res: any) => {
+/** 通过 emailService 获取邮件详情 */
+emailService.getEmailDetail(parseInt(idParam)).then((res: any) => {
   detailData.value = res.data || {}
   detailData.value.attachments = res.data.attachments || [];
   
@@ -105,43 +107,26 @@ http.post("/api/email/detail", {id: parseInt(idParam)}).then((res: any) => {
   showCC.value = ccs.value && ccs.value.length > 0
 })
 
+/** 获取名字首字母作为头像占位 */
 const getInitial = (name: string) => {
   if (!name) return '?';
   return name.charAt(0).toUpperCase();
-}
-
-const formatDetailDate = (dateStr: string) => {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  return d.toLocaleString([], {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: '2-digit', minute:'2-digit'
-  });
 }
 
 const handleDelete = () => {
   const id = detailData.value.id || parseInt(Array.isArray(route.params.id) ? route.params.id[0] : route.params.id);
   if (!id) return;
 
-  let tag: string = groupStore.tag;
-  if (!tag) {
-    tag = '{"type":0,"status":-1}';
-  }
-
-  let forcedDel = false;
-  try {
-    const groupTag = JSON.parse(tag);
-    forcedDel = groupTag.status === 3;
-  } catch (e) {
-    forcedDel = false;
-  }
+  /** 通过 isTrashGroup 判断当前分组是否为垃圾箱（status === 3） */
+  const forcedDel = isTrashGroup(groupStore.tag);
 
   ElMessageBox.confirm(lang.del_email_confirm, 'Warning', {
     confirmButtonText: 'OK',
     cancelButtonText: 'Cancel',
     type: 'warning',
   }).then(() => {
-    http.post("/api/email/del", {ids: [id], forcedDel}).then((res: any) => {
+    /** 通过 emailService 删除邮件 */
+    emailService.deleteEmails({ids: [id], forcedDel}).then((res: any) => {
       if (res.errorNo === 0) {
         ElMessage.success('Deleted successfully');
         router.push({name: 'list'});
@@ -153,9 +138,10 @@ const handleDelete = () => {
 }
 </script>
 
-<!-- 样式改造: Docusaurus 风格 | 日期: 20250425 -->
+<!-- 样式: Docusaurus BEM 风格 | 重构日期: 20260429 -->
 <style scoped>
-.mail-detail-container {
+/* 邮件详情容器 */
+.mail-detail {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -166,7 +152,7 @@ const handleDelete = () => {
   overflow: hidden;
 }
 
-.mail-detail-header {
+.mail-detail__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -174,24 +160,24 @@ const handleDelete = () => {
   border-bottom: 1px solid var(--ifm-border-color);
 }
 
-.back-btn {
+.mail-detail__back-btn {
   border-radius: var(--ifm-global-radius);
   font-size: 16px;
   padding: 8px 10px;
 }
 
-.action-buttons .el-button {
+.mail-detail__actions .el-button {
   border-radius: var(--ifm-global-radius);
   font-size: 16px;
 }
 
-.mail-detail-content {
+.mail-detail__content {
   flex-grow: 1;
   overflow-y: auto;
   padding: var(--ifm-spacing-lg) var(--ifm-spacing-xl);
 }
 
-.mail-subject {
+.mail-detail__subject {
   font-size: 28px;
   font-weight: 700;
   color: var(--ifm-color-content);
@@ -199,7 +185,7 @@ const handleDelete = () => {
   line-height: 1.3;
 }
 
-.mail-meta-card {
+.mail-detail__meta-card {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -210,13 +196,13 @@ const handleDelete = () => {
   background: var(--ifm-background-surface-color);
 }
 
-.meta-left {
+.mail-detail__meta-left {
   display: flex;
   align-items: center;
   gap: var(--ifm-spacing-md);
 }
 
-.avatar-placeholder {
+.mail-detail__avatar {
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -230,79 +216,79 @@ const handleDelete = () => {
   flex-shrink: 0;
 }
 
-.sender-line {
+.mail-detail__sender-line {
   margin-bottom: 4px;
 }
 
-.sender-name {
+.mail-detail__sender-name {
   font-weight: 600;
   font-size: 15px;
   color: var(--ifm-color-content);
   margin-right: var(--ifm-spacing-sm);
 }
 
-.sender-email {
+.mail-detail__sender-email {
   color: var(--ifm-color-content-secondary);
   font-size: 14px;
 }
 
-.receivers-line {
+.mail-detail__receivers-line {
   font-size: 13px;
   color: var(--ifm-color-content-secondary);
 }
 
-.meta-label {
+.mail-detail__meta-label {
   color: var(--ifm-color-content-muted);
   margin-right: 4px;
 }
 
-.cc-section {
+.mail-detail__cc-section {
   margin-left: var(--ifm-spacing-sm);
 }
 
-.meta-right {
+.mail-detail__meta-right {
   color: var(--ifm-color-content-secondary);
   font-size: 14px;
 }
 
-.custom-divider {
+.mail-detail__divider {
   margin: var(--ifm-spacing-sm) 0 var(--ifm-spacing-lg) 0;
 }
 
-.mail-body {
+.mail-detail__body {
   font-size: 16px;
   line-height: 1.7;
   color: var(--ifm-color-content);
   min-height: 200px;
 }
 
-.body-html :deep(img) {
+.mail-detail__body-html :deep(img) {
   max-width: 100%;
   height: auto;
 }
 
-.body-text {
+.mail-detail__body-text {
   white-space: pre-wrap;
 }
 
-.attachments-section {
+.mail-detail__attachments {
   margin-top: var(--ifm-spacing-xl);
 }
 
-.attachments-title {
+.mail-detail__attachments-title {
   font-size: 15px;
   font-weight: 600;
   margin-bottom: var(--ifm-spacing-md);
   color: var(--ifm-color-content);
 }
 
-.attachments-list {
+.mail-detail__attachments-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ifm-spacing-md);
 }
 
-.attachment-card {
+.mail-detail__attachment-card {
   display: flex;
   align-items: center;
   padding: var(--ifm-spacing-sm) var(--ifm-spacing-md);
@@ -314,19 +300,19 @@ const handleDelete = () => {
   max-width: 300px;
 }
 
-.attachment-card:hover {
+.mail-detail__attachment-card:hover {
   border-color: var(--ifm-color-primary);
-  background-color: var(--pm-bg-hover);
+  background-color: var(--ifm-background-hover-color);
   text-decoration: none;
 }
 
-.att-icon {
+.mail-detail__att-icon {
   font-size: 22px;
   color: var(--ifm-color-content-secondary);
   margin-right: var(--ifm-spacing-sm);
 }
 
-.att-name {
+.mail-detail__att-name {
   flex-grow: 1;
   font-size: 14px;
   color: var(--ifm-color-content);
@@ -336,29 +322,29 @@ const handleDelete = () => {
   margin-right: var(--ifm-spacing-sm);
 }
 
-.att-download {
+.mail-detail__att-download {
   color: var(--ifm-color-primary);
   font-size: 18px;
 }
 
 @media (max-width: 768px) {
-  .mail-detail-header {
+  .mail-detail__header {
     padding: var(--ifm-spacing-sm) var(--ifm-spacing-md);
   }
-  .mail-detail-content {
+  .mail-detail__content {
     padding: var(--ifm-spacing-md);
   }
-  .mail-subject {
+  .mail-detail__subject {
     font-size: 22px;
   }
-  .mail-meta-card {
+  .mail-detail__meta-card {
     flex-direction: column;
     gap: var(--ifm-spacing-sm);
   }
-  .meta-right {
+  .mail-detail__meta-right {
     padding-left: 56px;
   }
-  .avatar-placeholder {
+  .mail-detail__avatar {
     width: 36px;
     height: 36px;
     font-size: 15px;

@@ -9,6 +9,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElButton: typeof import('element-plus/es')['ElButton']
+    ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
     ElDialog: typeof import('element-plus/es')['ElDialog']
     ElDivider: typeof import('element-plus/es')['ElDivider']
     ElDrawer: typeof import('element-plus/es')['ElDrawer']
@@ -43,6 +44,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     RuleSettings: typeof import('./src/components/RuleSettings.vue')['default']
     SecuritySettings: typeof import('./src/components/SecuritySettings.vue')['default']
+    SettingsCard: typeof import('./src/components/settings/SettingsCard.vue')['default']
     UserManagement: typeof import('./src/components/UserManagement.vue')['default']
   }
   export interface ComponentCustomProperties {

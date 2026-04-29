@@ -1,9 +1,5 @@
 <template>
-  <div class="settings-card">
-    <div class="settings-header">
-      <h3>{{ lang.email_folders }}</h3>
-      <p class="settings-desc">{{ lang.email_folders_desc }}</p>
-    </div>
+  <SettingsCard :title="lang.email_folders" :description="lang.email_folders_desc">
 
     <div class="tree-container">
       <el-tree
@@ -43,20 +39,21 @@
       </el-tree>
     </div>
 
-    <div class="form-actions">
+    <div class="settings__form-actions">
       <el-button type="primary" @click="addRoot" class="add-root-btn" plain>
         <el-icon><Plus /></el-icon> {{ lang.add_group }}
       </el-button>
     </div>
-  </div>
+  </SettingsCard>
 </template>
 
 <script setup lang="ts">
 import { reactive } from "vue";
 import lang from "../i18n/i18n";
-import { http } from "@/utils/axios";
+import { groupService } from "@/services/groupService";
 import { ElMessage } from "element-plus";
 import { Folder, Delete, Plus } from "@element-plus/icons-vue";
+import SettingsCard from "@/components/settings/SettingsCard.vue";
 
 interface TreeNode {
   children?: TreeNode[];
@@ -67,13 +64,15 @@ interface TreeNode {
 
 const data = reactive<TreeNode[]>([]);
 
-http.get("/api/group").then((res: any) => {
+/** 通过 groupService 获取分组树 */
+groupService.getGroupTree().then((res: any) => {
   data.push(...res.data);
 });
 
 const del = function (node: any, dataObj: TreeNode) {
   if (dataObj.id !== -1) {
-    http.post("/api/group/del", { id: dataObj.id }).then((res: any) => {
+    /** 通过 groupService 删除分组 */
+    groupService.deleteGroup(dataObj.id).then((res: any) => {
       if (res.errorNo !== 0) {
         ElMessage({ message: res.errorMsg, type: "error" });
       } else {
@@ -120,12 +119,13 @@ const addRoot = function () {
 
 const onInputBlur = function (item: TreeNode) {
   if (item.label !== "") {
-    http.post("/api/group/add", { name: item.label, parent_id: item.parent_id })
+    /** 通过 groupService 添加分组 */
+    groupService.addGroup(item.label, item.parent_id)
       .then((res: any) => {
         if (res.errorNo !== 0) {
           ElMessage({ message: res.errorMsg, type: "error" });
         } else {
-          http.get("/api/group").then((res: any) => {
+          groupService.getGroupTree().then((res: any) => {
             data.splice(0, data.length);
             data.push(...res.data);
           });
@@ -136,31 +136,13 @@ const onInputBlur = function (item: TreeNode) {
 </script>
 
 <style scoped>
-.settings-card {
-  padding: 0;
-}
-
-.settings-header {
-  margin-bottom: 24px;
-}
-
-.settings-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--pm-text-primary);
-  margin: 0 0 8px 0;
-}
-
-.settings-desc {
-  font-size: 14px;
-  color: var(--pm-text-secondary);
-  margin: 0;
-}
+/* 引入设置组件公共样式（settings__form-actions 等） */
+@import '@/assets/settings-common.css';
 
 .tree-container {
-  background: var(--pm-bg-secondary);
-  border: 1px solid var(--pm-border-color);
-  border-radius: var(--pm-radius-sm);
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-border-color);
+  border-radius: var(--ifm-global-radius);
   padding: 16px;
   margin-bottom: 24px;
 }
@@ -181,12 +163,12 @@ const onInputBlur = function (item: TreeNode) {
   display: flex;
   align-items: center;
   font-size: 14px;
-  color: var(--pm-text-primary);
+  color: var(--ifm-color-content);
 }
 
 .folder-icon {
   margin-right: 8px;
-  color: var(--pm-primary-color);
+  color: var(--ifm-color-primary);
   font-size: 16px;
 }
 
@@ -211,23 +193,18 @@ const onInputBlur = function (item: TreeNode) {
   height: 24px;
 }
 
-.form-actions {
-  display: flex;
-  justify-content: flex-start;
-}
-
 .add-root-btn {
-  border-radius: var(--pm-radius-sm);
+  border-radius: var(--ifm-global-radius);
 }
 
 /* Override element-plus tree hover styles */
 :deep(.el-tree-node__content) {
   height: 40px;
-  border-radius: var(--pm-radius-sm);
+  border-radius: var(--ifm-global-radius);
   margin-bottom: 4px;
 }
 
 :deep(.el-tree-node__content:hover) {
-  background-color: var(--pm-bg-hover);
+  background-color: var(--ifm-background-hover-color);
 }
 </style>

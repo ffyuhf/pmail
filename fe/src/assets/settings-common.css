@@ -1,0 +1,87 @@
+/**
+ * 设置组件公共样式（Docusaurus BEM 风格）
+ *
+ * 提取自 RuleSettings、UserManagement、SecuritySettings、GroupSettings 中
+ * 重复出现的表格容器、对话框、表单输入框、表单操作区等样式。
+ * 各设置组件通过 @import 引入，消除 ~100 行重复 CSS。
+ *
+ * 重构日期: 20260429
+ * 重构内容: --pm-* → --ifm-* 变量迁移 + BEM class 命名
+ */
+
+/* ===== 表格容器：统一表格外框样式 ===== */
+.settings__table-container {
+  border: 1px solid var(--ifm-border-color);
+  border-radius: var(--ifm-global-radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+/* 表格表头：深色背景 + 次要文字色 */
+.settings__table-container .el-table th.el-table__cell {
+  background-color: var(--ifm-background-color);
+  color: var(--ifm-color-content-secondary);
+  font-weight: 600;
+}
+
+/* 表格行悬浮时显示操作按钮 */
+.settings__table-container .el-table tr:hover .settings__row-actions {
+  opacity: 1;
+}
+
+/* 行操作按钮组：默认半透明，悬浮时全显示 */
+.settings__row-actions {
+  display: flex;
+  justify-content: flex-end;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+/* ===== 表单操作区 ===== */
+.settings__form-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* ===== 标签样式 ===== */
+.settings__tag {
+  border-radius: var(--ifm-global-radius);
+}
+
+/* ===== 对话框样式 ===== */
+.settings__dialog :deep(.el-dialog__header) {
+  border-bottom: 1px solid var(--ifm-border-color);
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+.settings__dialog-content {
+  padding: 0 8px;
+}
+
+/* ===== 高级输入框样式 ===== */
+.settings__input :deep(.el-input__wrapper) {
+  box-shadow: none;
+  border-radius: var(--ifm-global-radius);
+  border: 1px solid var(--ifm-border-color);
+  background-color: var(--ifm-background-color);
+  transition: all 0.2s;
+}
+
+.settings__input :deep(.el-input__wrapper:hover),
+.settings__input :deep(.el-input__wrapper.is-focus) {
+  border-color: var(--ifm-color-primary);
+  background-color: var(--ifm-background-surface-color);
+}
+
+/* ===== 分页器 ===== */
+.settings__pagination {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ===== 按钮通用样式 ===== */
+.settings__btn {
+  border-radius: var(--ifm-global-radius);
+}

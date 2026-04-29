@@ -1,37 +1,40 @@
 <template>
-  <div class="login-wrapper">
-    <div class="login-container">
-      <div class="login-left">
-        <div class="brand-info">
+  <!-- 登录页面（Docusaurus BEM 风格） -->
+  <div class="auth-page">
+    <div class="auth-page__container">
+      <!-- 左侧品牌区域 -->
+      <div class="auth-page__brand">
+        <div class="auth-page__brand-info">
           <h1>PMail</h1>
         </div>
       </div>
-      <div class="login-right">
-        <div class="login-form-box">
+      <!-- 右侧表单区域 -->
+      <div class="auth-page__form-area">
+        <div class="auth-page__form-box">
           <h2>{{ lang.login }}</h2>
-          <p class="subtitle">{{ lang.login_subtitle }}</p>
-          
-          <el-form :model="form" class="auth-form" @keyup.enter="onSubmit" label-position="top">
+          <p class="auth-page__subtitle">{{ lang.login_subtitle }}</p>
+
+          <el-form :model="form" class="auth-page__form" @keyup.enter="onSubmit" label-position="top">
             <el-form-item :label="lang.account">
-              <el-input 
-                v-model="form.account" 
+              <el-input
+                v-model="form.account"
                 :placeholder="lang.account"
                 size="large"
-                class="premium-input"
+                class="auth-page__input"
               />
             </el-form-item>
             <el-form-item :label="lang.password">
-              <el-input 
-                v-model="form.password" 
+              <el-input
+                v-model="form.password"
                 :placeholder="lang.password"
-                type="password" 
+                type="password"
                 size="large"
-                class="premium-input"
+                class="auth-page__input"
                 show-password
               />
             </el-form-item>
-            <div class="submit-action">
-              <el-button type="primary" @click="onSubmit" size="large" class="login-btn" :loading="loading">
+            <div class="auth-page__submit">
+              <el-button type="primary" @click="onSubmit" size="large" class="auth-page__submit-btn" :loading="loading">
                 {{ lang.login }}
               </el-button>
             </div>
@@ -47,7 +50,7 @@ import {reactive, ref} from 'vue'
 import {ElMessage} from 'element-plus'
 import {router} from "@/router";
 import lang from '../i18n/i18n';
-import {http} from "@/utils/axios";
+import {userService} from "@/services/userService";
 import {useGlobalStatusStore} from "@/stores/useGlobalStatusStore";
 
 const globalStatus = useGlobalStatusStore();
@@ -64,12 +67,13 @@ const onSubmit = () => {
     return;
   }
   loading.value = true;
-  http.post("/api/login", form).then((res: any) => {
+  /** 通过 userService 登录 */
+  userService.login(form.account, form.password).then((res: any) => {
     loading.value = false;
     if (res.errorNo !== 0) {
       ElMessage.error(res.errorMsg)
     } else {
-      Object.assign(globalStatus.userInfos , res.data) 
+      Object.assign(globalStatus.userInfos , res.data)
       router.replace({
         path: '/',
         query: {
@@ -83,9 +87,10 @@ const onSubmit = () => {
 }
 </script>
 
-<!-- 样式改造: Docusaurus 风格 | 日期: 20250425 -->
+<!-- 样式: Docusaurus BEM 风格 | 重构日期: 20260429 -->
 <style scoped>
-.login-wrapper {
+/* 登录页面：全屏居中布局 */
+.auth-page {
   width: 100vw;
   height: 100vh;
   background: var(--ifm-background-color);
@@ -95,7 +100,8 @@ const onSubmit = () => {
   padding: var(--ifm-spacing-lg);
 }
 
-.login-container {
+/* 登录卡片：左右分栏 */
+.auth-page__container {
   width: 100%;
   max-width: 1000px;
   min-height: 560px;
@@ -107,8 +113,8 @@ const onSubmit = () => {
   overflow: hidden;
 }
 
-/* 左侧品牌区域 */
-.login-left {
+/* 左侧品牌区域：主色渐变背景 */
+.auth-page__brand {
   flex: 1;
   background: linear-gradient(145deg, var(--ifm-color-primary-dark) 0%, var(--ifm-color-primary) 55%, var(--ifm-color-primary-light) 100%);
   padding: 64px;
@@ -118,7 +124,7 @@ const onSubmit = () => {
   justify-content: center;
 }
 
-.brand-info h1 {
+.auth-page__brand-info h1 {
   font-size: 48px;
   font-weight: 700;
   margin-bottom: var(--ifm-spacing-sm);
@@ -126,7 +132,7 @@ const onSubmit = () => {
 }
 
 /* 右侧表单区域 */
-.login-right {
+.auth-page__form-area {
   flex: 1;
   padding: 64px;
   display: flex;
@@ -134,50 +140,53 @@ const onSubmit = () => {
   justify-content: center;
 }
 
-.login-form-box {
+.auth-page__form-box {
   width: 100%;
   max-width: 380px;
   margin: 0 auto;
 }
 
-.login-form-box h2 {
+.auth-page__form-box h2 {
   font-size: 28px;
   font-weight: 700;
   color: var(--ifm-color-content);
   margin-bottom: var(--ifm-spacing-sm);
 }
 
-.subtitle {
+.auth-page__subtitle {
   color: var(--ifm-color-content-secondary);
   margin-bottom: var(--ifm-spacing-xl);
   font-size: 14px;
 }
 
-.auth-form :deep(.el-form-item__label) {
+/* 表单标签样式 */
+.auth-page__form :deep(.el-form-item__label) {
   font-weight: 500;
   color: var(--ifm-color-content);
   padding-bottom: 4px;
 }
 
-.premium-input :deep(.el-input__wrapper) {
+/* 输入框：统一圆角 + 边框风格 */
+.auth-page__input :deep(.el-input__wrapper) {
   background-color: var(--ifm-background-color);
   border-radius: var(--ifm-global-radius);
   box-shadow: 0 0 0 1px var(--ifm-border-color) inset !important;
 }
 
-.premium-input :deep(.el-input__wrapper:hover) {
+.auth-page__input :deep(.el-input__wrapper:hover) {
   box-shadow: 0 0 0 1px var(--ifm-color-content-secondary) inset !important;
 }
 
-.premium-input :deep(.el-input__wrapper.is-focus) {
+.auth-page__input :deep(.el-input__wrapper.is-focus) {
   box-shadow: 0 0 0 1px var(--ifm-color-primary) inset !important;
 }
 
-.submit-action {
+/* 提交按钮区 */
+.auth-page__submit {
   margin-top: var(--ifm-spacing-xl);
 }
 
-.login-btn {
+.auth-page__submit-btn {
   width: 100%;
   font-weight: 600;
   border-radius: var(--ifm-global-radius);
@@ -185,21 +194,22 @@ const onSubmit = () => {
   font-size: 15px;
 }
 
+/* 移动端：左右分栏改为上下堆叠 */
 @media (max-width: 768px) {
-  .login-container {
+  .auth-page__container {
     flex-direction: column;
     height: auto;
     min-height: 0;
   }
-  .login-left {
+  .auth-page__brand {
     padding: var(--ifm-spacing-xl) var(--ifm-spacing-lg);
     align-items: center;
     text-align: center;
   }
-  .brand-info h1 {
+  .auth-page__brand-info h1 {
     font-size: 36px;
   }
-  .login-right {
+  .auth-page__form-area {
     padding: var(--ifm-spacing-xl) var(--ifm-spacing-lg);
   }
 }

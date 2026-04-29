@@ -1,47 +1,41 @@
 <template>
-  <div class="settings-card">
-    <div class="settings-header">
-      <h3>{{ lang.modify_pwd }}</h3>
-      <p class="settings-desc">{{ lang.modify_pwd_desc }}</p>
-    </div>
-    
+  <!-- 密码修改区块 -->
+  <SettingsCard :title="lang.modify_pwd" :description="lang.modify_pwd_desc">
     <div class="settings-body">
       <el-form :model="ruleForm" :rules="rules" status-icon label-position="top" class="settings-form">
         <el-form-item :label="lang.modify_pwd" prop="new_pwd">
-          <el-input type="password" v-model="ruleForm.new_pwd" :placeholder="lang.enter_new_pwd" show-password class="premium-input"/>
+          <el-input type="password" v-model="ruleForm.new_pwd" :placeholder="lang.enter_new_pwd" show-password class="settings__input"/>
         </el-form-item>
 
         <el-form-item :label="lang.enter_again" prop="new_pwd2">
-          <el-input type="password" v-model="ruleForm.new_pwd2" :placeholder="lang.confirm_new_pwd" show-password class="premium-input"/>
+          <el-input type="password" v-model="ruleForm.new_pwd2" :placeholder="lang.confirm_new_pwd" show-password class="settings__input"/>
         </el-form-item>
 
-        <div class="form-actions">
-          <el-button type="primary" @click="submit" class="submit-btn">
+        <div class="settings__form-actions">
+          <el-button type="primary" @click="submit" class="settings__btn submit-btn">
             {{ lang.submit }}
           </el-button>
         </div>
       </el-form>
     </div>
+  </SettingsCard>
 
-    <el-divider class="settings-divider"/>
-
-    <div class="settings-header">
-      <h3 class="danger-text">{{ lang.logout }}</h3>
-      <p class="settings-desc">{{ lang.logout_desc }}</p>
-    </div>
+  <!-- 注销区块 -->
+  <SettingsCard :title="lang.logout" :description="lang.logout_desc" :danger-title="true">
     <div class="settings-body">
-      <el-button type="danger" plain @click="logout" class="logout-btn">
+      <el-button type="danger" plain @click="logout" class="settings__btn">
         {{ lang.logout }}
       </el-button>
     </div>
-  </div>
+  </SettingsCard>
 </template>
 
 <script setup lang="ts">
 import {reactive} from 'vue'
 import {ElNotification} from 'element-plus'
 import lang from '../i18n/i18n';
-import {http} from "@/utils/axios";
+import {userService} from "@/services/userService";
+import SettingsCard from "@/components/settings/SettingsCard.vue";
 
 const ruleForm = reactive({
   new_pwd: "",
@@ -53,12 +47,14 @@ const rules = reactive({
   new_pwd2: [{required: true, message: lang.err_required_pwd, trigger: 'blur'},],
 })
 
+/** 注销：通过 userService 调用注销接口 */
 const logout = function () {
-  http.post("/api/logout", {}).then(() => {
+  userService.logout().then(() => {
     location.reload();
   })
 }
 
+/** 修改密码：通过 userService 调用密码修改接口 */
 const submit = function () {
   if (ruleForm.new_pwd === "") return;
   if (ruleForm.new_pwd !== ruleForm.new_pwd2) {
@@ -69,7 +65,7 @@ const submit = function () {
     })
     return
   }
-  http.post("/api/settings/modify_password", {password: ruleForm.new_pwd}).then((res: any) => {
+  userService.modifyPassword(ruleForm.new_pwd).then((res: any) => {
     ElNotification({
       title: res.errorNo === 0 ? lang.succ : lang.fail,
       message: res.data,
@@ -80,66 +76,15 @@ const submit = function () {
 </script>
 
 <style scoped>
-.settings-card {
-  padding: 0;
-}
-
-.settings-header {
-  margin-bottom: 24px;
-}
-
-.settings-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--pm-text-primary);
-  margin: 0 0 8px 0;
-}
-
-.danger-text {
-  color: #ef4444 !important;
-}
-
-.settings-desc {
-  font-size: 14px;
-  color: var(--pm-text-secondary);
-  margin: 0;
-}
+/* 引入设置组件公共样式（settings__input、settings__form-actions 等） */
+@import '@/assets/settings-common.css';
 
 .settings-body {
   width: 100%;
 }
 
-.premium-input :deep(.el-input__wrapper) {
-  box-shadow: none;
-  border-radius: var(--pm-radius-sm);
-  border: 1px solid var(--pm-border-color);
-  background-color: var(--pm-bg-secondary);
-  transition: all 0.2s;
-}
-
-.premium-input :deep(.el-input__wrapper:hover),
-.premium-input :deep(.el-input__wrapper.is-focus) {
-  border-color: var(--pm-primary-color);
-  background-color: var(--pm-bg-primary);
-}
-
-.form-actions {
-  margin-top: 24px;
-}
-
 .submit-btn {
-  border-radius: var(--pm-radius-sm);
   font-weight: 500;
   padding: 10px 24px;
-}
-
-.logout-btn {
-  border-radius: var(--pm-radius-sm);
-  font-weight: 500;
-}
-
-.settings-divider {
-  margin: 32px 0;
-  border-color: var(--pm-border-color);
 }
 </style>

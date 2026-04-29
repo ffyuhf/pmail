@@ -1,5 +1,5 @@
 import {defineStore} from "pinia";
-import {http} from "@/utils/axios";
+import {userService} from "@/services/userService";
 import type {UserInfo} from "@/types/api";
 
 const useGlobalStatusStore = defineStore('useGlobalStatusStore', {
@@ -16,11 +16,11 @@ const useGlobalStatusStore = defineStore('useGlobalStatusStore', {
         }
     },
     actions: {
+        /** 初始化用户信息：通过 userService 获取当前用户数据 */
         init(callback: () => void) {
-            http.post("/api/user/info", {}).then((res: any) => {
+            userService.getUserInfo().then((res: any) => {
                 if (res.errorNo === 0) {
                     Object.assign(this.userInfos, res.data)
-                    console.log("userInfos")
                     callback()
                 }
             })

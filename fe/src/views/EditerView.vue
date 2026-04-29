@@ -1,54 +1,55 @@
 <template>
-  <div class="composer-container" :class="{ 'is-fullscreen': isFullscreen }">
-    <div class="composer-header">
-      <div class="composer-title-group">
+  <!-- 写信视图（Docusaurus BEM 风格） -->
+  <div class="composer" :class="{ 'composer--fullscreen': isFullscreen }">
+    <div class="composer__header">
+      <div class="composer__title-group">
         <!-- 返回按钮：隐藏 Sidebar 后需提供导航回列表的方式 -->
-        <el-icon class="back-btn" @click="router.back()" :size="20"><ArrowLeft /></el-icon>
-        <h2 class="composer-title">{{ lang.compose }}</h2>
+        <el-icon class="composer__back-btn" @click="router.back()" :size="20"><ArrowLeft /></el-icon>
+        <h2 class="composer__title">{{ lang.compose }}</h2>
       </div>
-      <div class="composer-actions">
-        <el-button class="action-btn" @click="upload">
+      <div class="composer__actions">
+        <el-button class="composer__action-btn" @click="upload">
           <el-icon><Paperclip /></el-icon> {{ lang.add_att }}
         </el-button>
-        <el-button type="primary" class="send-btn" @click="send(ruleFormRef)">
+        <el-button type="primary" class="composer__send-btn" @click="send(ruleFormRef)">
           <el-icon><Position /></el-icon> {{ lang.send }}
         </el-button>
         <input v-show="false" ref="fileRef" type="file" @change="fileChange" multiple>
       </div>
     </div>
 
-    <div class="composer-body">
-      <el-form :rules="rules" ref="ruleFormRef" :model="ruleForm" class="composer-form">
-        
-        <div class="compose-row">
-          <div class="field-label">{{ lang.sender }}</div>
-          <el-form-item prop="sender" class="flex-grow-item m-0">
+    <div class="composer__body">
+      <el-form :rules="rules" ref="ruleFormRef" :model="ruleForm" class="composer__form">
+
+        <div class="composer__row">
+          <div class="composer__field-label">{{ lang.sender }}</div>
+          <el-form-item prop="sender" class="composer__flex-grow composer__m0">
             <el-popover trigger="click" :width="400" placement="bottom-start">
               <template #reference>
-                <div class="sender-selector">
-                  <span class="sender-name">{{ ruleForm.nickName }}</span>
-                  <span class="sender-email">&lt;{{ ruleForm.sender }}@{{ ruleForm.pickDomain }}&gt;</span>
-                  <el-icon class="arrow-down"><ArrowDown /></el-icon>
+                <div class="composer__sender-selector">
+                  <span class="composer__sender-name">{{ ruleForm.nickName }}</span>
+                  <span class="composer__sender-email">{{ '<' + ruleForm.sender + '@' + ruleForm.pickDomain + '>' }}</span>
+                  <el-icon class="composer__arrow-down"><ArrowDown /></el-icon>
                 </div>
               </template>
               <template #default>
-                <div class="sender-edit-card">
-                  <div class="edit-row">
-                    <span class="edit-label">Prefix</span>
-                    <el-input 
+                <div class="composer__sender-edit">
+                  <div class="composer__edit-row">
+                    <span class="composer__edit-label">Prefix</span>
+                    <el-input
                       :disabled="!(globalStatus.userInfos.is_admin)"
-                      v-model="ruleForm.sender" 
+                      v-model="ruleForm.sender"
                       :placeholder="lang.sender_desc"
                     />
                   </div>
-                  <div class="edit-row">
-                    <span class="edit-label">Domain</span>
-                    <el-select v-model="ruleForm.pickDomain" class="w-full">
+                  <div class="composer__edit-row">
+                    <span class="composer__edit-label">Domain</span>
+                    <el-select v-model="ruleForm.pickDomain" class="composer__w-full">
                       <el-option :value="item" v-for="item in ruleForm.domains" :key="item">{{ item }}</el-option>
                     </el-select>
                   </div>
-                  <div class="edit-row">
-                    <span class="edit-label">{{ lang.nick_name }}</span>
+                  <div class="composer__edit-row">
+                    <span class="composer__edit-label">{{ lang.nick_name }}</span>
                     <el-input v-model="ruleForm.nickName"/>
                   </div>
                 </div>
@@ -57,56 +58,56 @@
           </el-form-item>
         </div>
 
-        <div class="compose-row">
-          <div class="field-label">{{ lang.to }}</div>
-          <el-form-item prop="receivers" class="flex-grow-item m-0 border-less-select">
-            <el-select 
-              v-model="ruleForm.receivers" 
-              multiple filterable allow-create :reserve-keyword="false" 
+        <div class="composer__row">
+          <div class="composer__field-label">{{ lang.to }}</div>
+          <el-form-item prop="receivers" class="composer__flex-grow composer__m0 composer__borderless-select">
+            <el-select
+              v-model="ruleForm.receivers"
+              multiple filterable allow-create :reserve-keyword="false"
               placeholder="Recipients..."
             ></el-select>
           </el-form-item>
         </div>
 
-        <div class="compose-row" v-if="ruleForm.cc.length > 0 || showCcBcc">
-          <div class="field-label">{{ lang.cc }}</div>
-          <el-form-item prop="cc" class="flex-grow-item m-0 border-less-select">
-            <el-select 
-              v-model="ruleForm.cc" 
-              multiple filterable allow-create :reserve-keyword="false" 
+        <div class="composer__row" v-if="ruleForm.cc.length > 0 || showCcBcc">
+          <div class="composer__field-label">{{ lang.cc }}</div>
+          <el-form-item prop="cc" class="composer__flex-grow composer__m0 composer__borderless-select">
+            <el-select
+              v-model="ruleForm.cc"
+              multiple filterable allow-create :reserve-keyword="false"
               placeholder="Cc..."
             ></el-select>
           </el-form-item>
         </div>
 
-        <div class="compose-row" v-if="ruleForm.bcc.length > 0 || showCcBcc">
-          <div class="field-label">{{ lang.bcc }}</div>
-          <el-form-item prop="bcc" class="flex-grow-item m-0 border-less-select">
-            <el-select 
-              v-model="ruleForm.bcc" 
-              multiple filterable allow-create :reserve-keyword="false" 
+        <div class="composer__row" v-if="ruleForm.bcc.length > 0 || showCcBcc">
+          <div class="composer__field-label">{{ lang.bcc }}</div>
+          <el-form-item prop="bcc" class="composer__flex-grow composer__m0 composer__borderless-select">
+            <el-select
+              v-model="ruleForm.bcc"
+              multiple filterable allow-create :reserve-keyword="false"
               placeholder="Bcc..."
             ></el-select>
           </el-form-item>
         </div>
 
-        <div class="compose-row subject-row">
-          <el-form-item prop="subject" class="w-full m-0 border-less-input">
+        <div class="composer__row composer__row--subject">
+          <el-form-item prop="subject" class="composer__w-full composer__m0 composer__borderless-input">
             <el-input v-model="ruleForm.subject" placeholder="Subject"></el-input>
-            <div class="cc-bcc-toggle" @click="showCcBcc = !showCcBcc" v-if="!showCcBcc">Cc/Bcc</div>
+            <div class="composer__cc-bcc-toggle" @click="showCcBcc = !showCcBcc" v-if="!showCcBcc">Cc/Bcc</div>
           </el-form-item>
         </div>
 
-        <div class="editor-wrapper">
-          <Toolbar class="editor-toolbar" :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode"/>
-          <Editor class="editor-content" v-model="valueHtml" :defaultConfig="editorConfig" :mode="mode" @onCreated="handleCreated"/>
+        <div class="composer__editor-wrapper">
+          <Toolbar class="composer__editor-toolbar" :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode"/>
+          <Editor class="composer__editor-content" v-model="valueHtml" :defaultConfig="editorConfig" :mode="mode" @onCreated="handleCreated"/>
         </div>
 
-        <div class="attachments-preview" v-if="fileList.length > 0">
-          <div class="att-chip" v-for="(item, index) in fileList" :key="index">
-            <el-icon class="att-icon"><Document /></el-icon>
-            <span class="att-name">{{ item.name }}</span>
-            <el-icon class="att-remove" @click="delFile(index)"><Close/></el-icon>
+        <div class="composer__attachments" v-if="fileList.length > 0">
+          <div class="composer__att-chip" v-for="(item, index) in fileList" :key="index">
+            <el-icon class="composer__att-icon"><Document /></el-icon>
+            <span class="composer__att-name">{{ item.name }}</span>
+            <el-icon class="composer__att-remove" @click="delFile(index)"><Close/></el-icon>
           </div>
         </div>
       </el-form>
@@ -123,9 +124,10 @@ import lang from '../i18n/i18n';
 import {Editor, Toolbar} from '@wangeditor/editor-for-vue'
 import {i18nChangeLanguage} from '@wangeditor/editor'
 import {useRouter} from 'vue-router';
-import {http} from "@/utils/axios";
+import {emailService} from "@/services/emailService";
 import useGroupStore from '../stores/group'
 import {useGlobalStatusStore} from "@/stores/useGlobalStatusStore";
+import {createStringEmailValidator} from "@/utils/validators";
 
 const router = useRouter();
 const groupStore = useGroupStore()
@@ -192,6 +194,7 @@ const init = function () {
 }
 init()
 
+/** 发件人验证：前缀不能为空且不能包含 @ */
 const validateSender = function (rule: any, value: any, callback: any) {
   if (typeof ruleForm.sender === "undefined" || ruleForm.sender === null || ruleForm.sender.trim() === "") {
     callback(new Error(lang.err_sender_must))
@@ -202,49 +205,12 @@ const validateSender = function (rule: any, value: any, callback: any) {
   }
 }
 
-const checkEmail = function (str: string) {
-  const re = /.+@.+\..+/;
-  return re.test(str);
-}
-
-const validateReceivers = function (rule: any, value: any, callback: any) {
-  for (let index = 0; index < ruleForm.receivers.length; index++) {
-    let element = ruleForm.receivers[index];
-    if (!checkEmail(element)) {
-      callback(new Error(lang.err_email_format))
-      return
-    }
-  }
-  callback()
-}
-
-const validateCc = function (rule: any, value: any, callback: any) {
-  for (let index = 0; index < ruleForm.cc.length; index++) {
-    let element = ruleForm.cc[index];
-    if (!checkEmail(element)) {
-      callback(new Error(lang.err_email_format))
-      return
-    }
-  }
-  callback()
-}
-
-const validateBcc = function (rule: any, value: any, callback: any) {
-  for (let index = 0; index < ruleForm.bcc.length; index++) {
-    let element = ruleForm.bcc[index];
-    if (!checkEmail(element)) {
-      callback(new Error(lang.err_email_format))
-      return
-    }
-  }
-  callback()
-}
-
+/** 使用 createStringEmailValidator 工厂函数替代重复的 validateReceivers/validateCc/validateBcc */
 const rules = reactive({
   sender: [{validator: validateSender, trigger: 'change'}],
-  receivers: [{validator: validateReceivers, trigger: 'change'}],
-  cc: [{validator: validateCc, trigger: 'change'}],
-  bcc: [{validator: validateBcc, trigger: 'change'}],
+  receivers: [{validator: createStringEmailValidator(() => ruleForm.receivers, lang.err_email_format), trigger: 'change'}],
+  cc: [{validator: createStringEmailValidator(() => ruleForm.cc, lang.err_email_format), trigger: 'change'}],
+  bcc: [{validator: createStringEmailValidator(() => ruleForm.bcc, lang.err_email_format), trigger: 'change'}],
   subject: [{required: true, message: lang.err_title_must, trigger: 'change'}],
 })
 
@@ -258,7 +224,7 @@ onBeforeUnmount(() => {
 const handleCreated = (editor: any) => {
   editorRef.value = editor
 
-  // 覆写 wangeditor 内置全屏方法：让全屏作用于整个 composer-container 而非仅 editor-wrapper
+  // 覆写 wangeditor 内置全屏方法：让全屏作用于整个 composer 而非仅 editor-wrapper
   // 原始实现只给 toolbar 和 editor 的父容器加全屏样式，会丢失收件人、主题、附件等区域
   editor.fullScreen = () => {
     editor.isFullScreen = true
@@ -284,7 +250,8 @@ const send = function (formEl: any) {
 
       let text = editorRef.value.getText()
 
-      http.post("/api/email/send", {
+      /** 通过 emailService 发送邮件 */
+      emailService.sendEmail({
         from: {name: ruleForm.nickName, email: ruleForm.sender + "@" + ruleForm.pickDomain},
         to: objectTos,
         cc: objectCcs,
@@ -333,9 +300,10 @@ const delFile = function (index: number) {
 }
 </script>
 
-<!-- 样式改造: Docusaurus 风格 | 日期: 20250425 -->
+<!-- 样式: Docusaurus BEM 风格 | 重构日期: 20260429 -->
 <style scoped>
-.composer-container {
+/* 写信容器 */
+.composer {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -346,7 +314,7 @@ const delFile = function (index: number) {
   overflow: hidden;
 }
 
-.composer-header {
+.composer__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -356,24 +324,24 @@ const delFile = function (index: number) {
 }
 
 /* 标题组：返回按钮 + 标题横向排列 */
-.composer-title-group {
+.composer__title-group {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
 /* 返回按钮：隐藏 Sidebar 后的导航替代方式 */
-.back-btn {
+.composer__back-btn {
   cursor: pointer;
   color: var(--ifm-color-content-secondary);
   transition: color var(--ifm-transition-fast, 0.1s);
 }
 
-.back-btn:hover {
+.composer__back-btn:hover {
   color: var(--ifm-color-primary);
 }
 
-.composer-title {
+.composer__title {
   font-size: 28px;
   font-weight: 600;
   color: var(--ifm-color-content);
@@ -381,48 +349,54 @@ const delFile = function (index: number) {
   letter-spacing: -0.02em;
 }
 
-.composer-actions {
+.composer__actions {
   display: flex;
   gap: 12px;
 }
 
-.action-btn {
+.composer__action-btn {
   background: var(--ifm-background-color);
   border: 1px solid var(--ifm-border-color);
   color: var(--ifm-color-content-secondary);
 }
 
-.action-btn:hover {
+.composer__action-btn:hover {
   background: var(--ifm-background-surface-color);
   color: var(--ifm-color-content);
   border-color: var(--ifm-border-color);
 }
 
-.send-btn {
+.composer__send-btn {
   box-shadow: 0 8px 16px rgba(0, 113, 227, 0.2);
 }
 
-.composer-body {
+.composer__body {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
 }
 
-.composer-form {
+.composer__form {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-.compose-row {
+/* 表单行：标签 + 输入框横向排列 */
+.composer__row {
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--ifm-color-emphasis-300);
   padding: 6px 20px;
 }
 
-.field-label {
+/* 主题行：无标签，输入框占满 */
+.composer__row--subject {
+  position: relative;
+}
+
+.composer__field-label {
   width: 70px;
   color: var(--ifm-color-content-secondary);
   font-weight: 600;
@@ -431,14 +405,13 @@ const delFile = function (index: number) {
   letter-spacing: 0.05em;
 }
 
-.flex-grow-item {
-  flex-grow: 1;
-}
+/* 工具类 */
+.composer__flex-grow { flex-grow: 1; }
+.composer__m0 { margin: 0; }
+.composer__w-full { width: 100%; }
 
-.m-0 { margin: 0; }
-.w-full { width: 100%; }
-
-.sender-selector {
+/* 发件人选择器 */
+.composer__sender-selector {
   display: inline-flex;
   align-items: center;
   padding: 8px 12px;
@@ -449,82 +422,80 @@ const delFile = function (index: number) {
   transition: background 0.2s;
 }
 
-.sender-selector:hover {
+.composer__sender-selector:hover {
   background-color: var(--ifm-background-color);
   transform: translateY(-1px);
 }
 
-.sender-name {
+.composer__sender-name {
   font-weight: 600;
   margin-right: 6px;
   color: var(--ifm-color-content);
 }
 
-.sender-email {
+.composer__sender-email {
   color: var(--ifm-color-content-secondary);
   margin-right: 8px;
 }
 
-.arrow-down {
+.composer__arrow-down {
   font-size: 12px;
   color: var(--ifm-color-content-muted);
 }
 
-.sender-edit-card {
+/* 发件人编辑卡片（Popover 内容） */
+.composer__sender-edit {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.edit-row {
+.composer__edit-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.edit-label {
+.composer__edit-label {
   font-size: 12px;
   font-weight: 600;
   color: var(--ifm-color-content-secondary);
 }
 
-/* Borderless inputs to make it look like integrated fields */
-.border-less-select :deep(.el-input__wrapper),
-.border-less-input :deep(.el-input__wrapper) {
+/* 无边框输入框：使表单行看起来一体化 */
+.composer__borderless-select :deep(.el-input__wrapper),
+.composer__borderless-input :deep(.el-input__wrapper) {
   box-shadow: none !important;
   background: transparent;
   padding-left: 0;
 }
 
-.border-less-select :deep(.el-select .el-input__wrapper) {
+.composer__borderless-select :deep(.el-select .el-input__wrapper) {
   background: var(--ifm-background-surface-color) !important;
   box-shadow: 0 0 0 1px var(--ifm-border-color) inset !important;
   border-radius: 10px;
   padding: 2px 10px;
 }
 
-.border-less-select :deep(.el-select .el-input__wrapper:hover),
-.border-less-select :deep(.el-select .el-input__wrapper.is-focus) {
+.composer__borderless-select :deep(.el-select .el-input__wrapper:hover),
+.composer__borderless-select :deep(.el-select .el-input__wrapper.is-focus) {
   box-shadow: 0 0 0 1px var(--ifm-color-primary) inset !important;
   background: var(--ifm-background-color) !important;
 }
 
-.border-less-select :deep(.el-select__tags .el-tag) {
+.composer__borderless-select :deep(.el-select__tags .el-tag) {
   background: var(--ifm-background-surface-color);
   border-color: var(--ifm-border-color);
   color: var(--ifm-color-content);
 }
 
-.border-less-select :deep(.el-input__inner),
-.border-less-input :deep(.el-input__inner) {
+.composer__borderless-select :deep(.el-input__inner),
+.composer__borderless-input :deep(.el-input__inner) {
   font-size: 15px;
 }
 
-.subject-row {
-  position: relative;
-}
-
-.cc-bcc-toggle {
+/* Cc/Bcc 切换按钮 */
+.composer__cc-bcc-toggle {
   position: absolute;
   right: 0;
   top: 50%;
@@ -535,11 +506,12 @@ const delFile = function (index: number) {
   font-weight: 500;
 }
 
-.cc-bcc-toggle:hover {
+.composer__cc-bcc-toggle:hover {
   text-decoration: underline;
 }
 
-.editor-wrapper {
+/* 编辑器区域 */
+.composer__editor-wrapper {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
@@ -547,7 +519,7 @@ const delFile = function (index: number) {
   --w-e-toolbar-bg-color: var(--ifm-background-surface-color);
   --w-e-toolbar-color: var(--ifm-color-content);
   --w-e-toolbar-active-color: var(--ifm-color-primary);
-  --w-e-toolbar-active-bg-color: var(--pm-row-hover);
+  --w-e-toolbar-active-bg-color: var(--ifm-row-hover-background);
   --w-e-textarea-bg-color: transparent;
   --w-e-textarea-color: var(--ifm-color-content);
   --w-e-textarea-slight-bg-color: transparent;
@@ -555,29 +527,30 @@ const delFile = function (index: number) {
   --w-e-border-color: var(--ifm-color-emphasis-300);
 }
 
-.editor-toolbar {
+.composer__editor-toolbar {
   border-bottom: 1px solid var(--ifm-color-emphasis-300);
   background-color: var(--ifm-background-surface-color) !important;
 }
 
-.editor-content {
+.composer__editor-content {
   flex-grow: 1;
   padding: 14px 20px;
   overflow-y: hidden;
 }
 
-.editor-content :deep(.w-e-text-container),
-.editor-content :deep(.w-e-scroll),
-.editor-content :deep(.w-e-text) {
+.composer__editor-content :deep(.w-e-text-container),
+.composer__editor-content :deep(.w-e-scroll),
+.composer__editor-content :deep(.w-e-text) {
   background: transparent !important;
   color: var(--ifm-color-content) !important;
 }
 
-.editor-content :deep(.w-e-text-placeholder) {
+.composer__editor-content :deep(.w-e-text-placeholder) {
   color: var(--ifm-color-content-muted) !important;
 }
 
-.attachments-preview {
+/* 附件预览区 */
+.composer__attachments {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -586,7 +559,7 @@ const delFile = function (index: number) {
   background: var(--ifm-background-surface-color);
 }
 
-.att-chip {
+.composer__att-chip {
   display: flex;
   align-items: center;
   background: var(--ifm-background-color);
@@ -598,17 +571,17 @@ const delFile = function (index: number) {
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.att-chip:hover {
+.composer__att-chip:hover {
   transform: translateY(-1px);
   box-shadow: var(--ifm-global-shadow-md);
 }
 
-.att-icon {
+.composer__att-icon {
   margin-right: 6px;
   color: var(--ifm-color-content-secondary);
 }
 
-.att-name {
+.composer__att-name {
   max-width: 150px;
   white-space: nowrap;
   overflow: hidden;
@@ -616,38 +589,39 @@ const delFile = function (index: number) {
   margin-right: 8px;
 }
 
-.att-remove {
+.composer__att-remove {
   cursor: pointer;
   color: var(--ifm-color-content-muted);
 }
 
-.att-remove:hover {
+.composer__att-remove:hover {
   color: #ef4444;
 }
 
+/* Dark 模式下编辑器修正 */
 @media (prefers-color-scheme: dark) {
-  .editor-wrapper {
+  .composer__editor-wrapper {
     background: var(--ifm-background-surface-color);
   }
 
-  .editor-content :deep(.w-e-text-container) {
+  .composer__editor-content :deep(.w-e-text-container) {
     border-left-color: transparent !important;
     border-right-color: transparent !important;
   }
 
-  .editor-content :deep(.w-e-bar) {
+  .composer__editor-content :deep(.w-e-bar) {
     background: var(--ifm-background-surface-color) !important;
     color: var(--ifm-color-content) !important;
   }
 
-  .editor-content :deep(.w-e-bar-item button),
-  .editor-content :deep(.w-e-menu-tooltip-v5) {
+  .composer__editor-content :deep(.w-e-bar-item button),
+  .composer__editor-content :deep(.w-e-menu-tooltip-v5) {
     color: var(--ifm-color-content) !important;
   }
 }
 
 /* 全屏模式：整个写信组件铺满浏览器窗口 */
-.composer-container.is-fullscreen {
+.composer--fullscreen {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
@@ -661,15 +635,15 @@ const delFile = function (index: number) {
 }
 
 @media (max-width: 768px) {
-  .sender-selector {
+  .composer__sender-selector {
     padding: 6px;
     max-width: 100%;
     overflow: hidden;
   }
-  .sender-email {
+  .composer__sender-email {
     display: none;
   }
-  .composer-header {
+  .composer__header {
     padding: 12px 16px;
   }
 }

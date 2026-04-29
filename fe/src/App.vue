@@ -7,7 +7,7 @@
 import {RouterView, useRoute} from 'vue-router'
 import HomeHeader from '@/components/HomeHeader.vue'
 import HomeAside from '@/components/HomeAside.vue';
-import {ref, watch, onMounted} from 'vue'
+import {ref, watch, onMounted, computed} from 'vue'
 import {useGlobalStatusStore} from "@/stores/useGlobalStatusStore";
 
 const route = useRoute()
@@ -25,22 +25,25 @@ watch(
     }
 )
 
+/** 布局控制计算属性：消除模板中重复的 pageName 条件判断 */
+const showHeader = computed(() => pageName.value !== 'login' && pageName.value !== 'setup')
+const showSidebar = computed(() => showHeader.value && pageName.value !== 'editer')
+const isFullBleed = computed(() => !showHeader.value || pageName.value === 'editer')
+
 </script>
 
 <template>
   <div id="main">
-    <!-- Navbar: 始终在顶部显示（login/setup 页除外） -->
-    <HomeHeader v-if="pageName !== 'login' && pageName !== 'setup'"/>
+    <!-- Navbar: login/setup 页不显示 -->
+    <HomeHeader v-if="showHeader"/>
     <div id="content">
-      <!-- Sidebar: 左侧固定宽度 -->
-      <!-- Sidebar: editer 页隐藏以实现编辑器全屏 -->
-      <div id="aside" v-if="pageName !== 'login' && pageName !== 'setup' && pageName !== 'editer'">
+      <!-- Sidebar: login/setup/editer 页隐藏 -->
+      <div id="aside" v-if="showSidebar">
         <HomeAside/>
       </div>
-      <!-- 移动端侧边栏抽屉 -->
-      <!-- 移动端侧边栏抽屉：editer 页同样隐藏 -->
+      <!-- 移动端侧边栏抽屉：login/setup/editer 页隐藏 -->
       <el-drawer
-          v-if="pageName !== 'login' && pageName !== 'setup' && pageName !== 'editer'"
+          v-if="showSidebar"
           v-model="globalStatus.mobileDrawerVisible"
           direction="ltr"
           size="260px"
@@ -49,9 +52,8 @@ watch(
       >
         <HomeAside/>
       </el-drawer>
-      <!-- 主内容区 -->
-      <!-- editer 页也去除内边距，实现编辑器全屏填充 -->
-      <div id="body" :class="{ 'full-bleed': pageName === 'login' || pageName === 'setup' || pageName === 'editer' }">
+      <!-- 主内容区：login/setup/editer 页去除内边距 -->
+      <div id="body" :class="{ 'full-bleed': isFullBleed }">
         <RouterView v-slot="{ Component }">
           <transition name="page-fade" mode="out-in">
             <component :is="Component" />

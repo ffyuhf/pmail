@@ -1,18 +1,32 @@
 <template>
-  <div class="list-view-container">
-    <div class="list-header">
-      <div class="header-title">
+  <!-- 邮件列表视图（Docusaurus BEM 风格） -->
+  <div class="mail-list">
+    <div class="mail-list__header">
+      <div class="mail-list__title">
         <h2>{{ groupStore.name }}</h2>
       </div>
-      <div class="header-actions">
-        <el-button @click="del" class="action-btn" plain>
+      <div class="mail-list__actions">
+        <!-- 全选复选框：一键选中/取消当前页所有邮件 -->
+        <el-checkbox
+          v-model="isAllSelected"
+          :indeterminate="isIndeterminate"
+          @change="toggleSelectAll"
+          class="mail-list__select-all"
+        >
+          {{ lang.select_all }}
+        </el-checkbox>
+        <!-- 已选计数：实时显示当前选中邮件数量 -->
+        <span v-if="selectedCount > 0" class="mail-list__selected-count">
+          {{ selectedCount }} {{ lang.selected_count }}
+        </span>
+        <el-button @click="del" class="mail-list__action-btn" plain>
           <el-icon><Delete /></el-icon> {{ lang.del_btn }}
         </el-button>
-        <el-button @click="markRead" class="action-btn" plain>
+        <el-button @click="markRead" class="mail-list__action-btn" plain>
           <el-icon><View /></el-icon> {{ lang.read_btn }}
         </el-button>
-        <el-dropdown class="move-dropdown">
-          <el-button class="action-btn" plain>
+        <el-dropdown class="mail-list__move-dropdown">
+          <el-button class="mail-list__action-btn" plain>
             <el-icon><Folder /></el-icon> {{ lang.move_btn }}
             <el-icon class="el-icon--right"><EpArrowDownBold/></el-icon>
           </el-button>
@@ -24,28 +38,29 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button type="primary" class="compose-btn" @click="router.push('/editer')">
+        <el-button type="primary" class="mail-list__compose-btn" @click="router.push('/editer')">
           <el-icon><EditPen /></el-icon> {{ lang.compose }}
         </el-button>
       </div>
     </div>
 
-    <div class="list-content">
-      <el-table 
-        ref="taskTableDataRef" 
-        :data="data" 
-        :show-header="false" 
-        class="modern-mail-table"
+    <div class="mail-list__content">
+      <el-table
+        ref="taskTableDataRef"
+        :data="data"
+        :show-header="false"
+        class="mail-list__table"
         @row-click="rowClick"
         :row-style="rowStyle"
+        @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="40"/>
-        
+
         <!-- 状态指示列：未读圆点 + 危险/错误图标 -->
-        <el-table-column width="44" class-name="status-col">
+        <el-table-column width="44" class-name="mail-list__status-col">
           <template #default="scope">
-            <div class="status-indicator">
-              <span class="unread-dot" v-if="!scope.row.is_read"></span>
+            <div class="mail-list__status">
+              <span class="mail-list__unread-dot" v-if="!scope.row.is_read"></span>
               <el-tooltip effect="dark" :content="lang.dangerous" placement="top-start" v-if="scope.row.dangerous">
                 <el-icon color="#ef4444"><Warning /></el-icon>
               </el-tooltip>
@@ -58,16 +73,16 @@
 
         <el-table-column min-width="250">
           <template #default="scope">
-            <div class="mail-row-content" :class="{'is-unread': !scope.row.is_read}">
-              <div class="mail-main-info">
-                <div class="mail-sender">
+            <div class="mail-list__row" :class="{'mail-list__row--unread': !scope.row.is_read}">
+              <div class="mail-list__row-main">
+                <div class="mail-list__sender">
                   {{ scope.row.sender.Name !== '' ? scope.row.sender.Name : scope.row.sender.EmailAddress }}
                 </div>
-                <div class="mail-subject">{{ scope.row.title }}</div>
-                <div class="mail-snippet">{{ scope.row.desc }}</div>
+                <div class="mail-list__subject">{{ scope.row.title }}</div>
+                <div class="mail-list__snippet">{{ scope.row.desc }}</div>
               </div>
-              <div class="mail-meta">
-                <div class="mail-date">{{ formatShortDate(scope.row.datetime) }}</div>
+              <div class="mail-list__meta">
+                <div class="mail-list__date">{{ formatShortDate(scope.row.datetime) }}</div>
               </div>
             </div>
           </template>
@@ -75,11 +90,25 @@
       </el-table>
     </div>
 
-    <div class="pagination-wrapper" v-if="totalPage > 0">
-      <el-pagination 
-        background 
-        layout="prev, pager, next" 
-        :page-count="totalPage" 
+    <div class="mail-list__pagination" v-if="totalPage > 0">
+      <!-- 每页条数选择器：用户可自定义每页显示邮件数量 -->
+      <div class="mail-list__page-size">
+        <span class="mail-list__page-size-label">{{ lang.per_page }}</span>
+        <el-select
+          v-model="pageSize"
+          class="mail-list__page-size-select"
+          @change="handlePageSizeChange"
+        >
+          <el-option :value="15" label="15"/>
+          <el-option :value="25" label="25"/>
+          <el-option :value="50" label="50"/>
+          <el-option :value="100" label="100"/>
+        </el-select>
+      </div>
+      <el-pagination
+        background
+        layout="prev, pager, next"
+        :page-count="totalPage"
         @current-change="pageChange"
       />
     </div>
@@ -90,28 +119,30 @@
 import {EpArrowDownBold} from "vue-icons-plus/ep";
 import {Delete, View, Folder, EditPen, Warning} from "@element-plus/icons-vue";
 import {useRouter} from 'vue-router'
-import {ref, watch} from 'vue'
+import {ref, watch, computed} from 'vue'
 import useGroupStore from '../stores/group'
 import lang from '../i18n/i18n';
-import {http} from "@/utils/axios";
+import {emailService} from "@/services/emailService";
+import {groupService} from "@/services/groupService";
 import {ElMessage, ElMessageBox} from "element-plus";
-import type {EmailListItem, GroupListItem, ApiResponse, EmailListResponse} from "@/types/api";
+import type {EmailListItem, GroupListItem} from "@/types/api";
+import {formatShortDate} from "@/utils/dateFormat";
+import {normalizeTag, isTrashGroup} from "@/utils/groupTag";
 
 const router = useRouter();
 const groupStore = useGroupStore()
 const groupList = ref<GroupListItem[]>([])
 const taskTableDataRef = ref<any>(null)
-let tag = groupStore.tag;
-
-if (tag === "") {
-  tag = '{"type":0,"status":-1}'
-}
+let tag = normalizeTag(groupStore.tag);
 
 watch(groupStore, async (newV) => {
-  tag = newV.tag;
-  if (tag === "") {
-    tag = '{"type":0,"status":-1}'
-  }
+  tag = normalizeTag(newV.tag);
+  data.value = []
+  updateList()
+})
+
+/** 监听搜索关键词变化，自动刷新列表 */
+watch(() => groupStore.keyword, () => {
   data.value = []
   updateList()
 })
@@ -119,15 +150,36 @@ watch(groupStore, async (newV) => {
 const data = ref<EmailListItem[]>([])
 const totalPage = ref(0)
 
+/** 每页显示条数：用户可通过下拉选择器自定义（默认 15） */
+const pageSize = ref(15)
+
+/** 当前选中行列表（由 el-table 的 selection-change 事件维护） */
+const selectedRows = ref<EmailListItem[]>([])
+
+/** 已选邮件数量 */
+const selectedCount = computed(() => selectedRows.value.length)
+
+/** 全选复选框绑定值：当全部选中时为 true，全部未选时为 false */
+const isAllSelected = computed(() => {
+  return data.value.length > 0 && selectedRows.value.length === data.value.length
+})
+
+/** 半选状态：部分选中时复选框显示 indeterminate 样式 */
+const isIndeterminate = computed(() => {
+  return selectedRows.value.length > 0 && selectedRows.value.length < data.value.length
+})
+
+/** 刷新邮件列表：通过 emailService 获取数据，使用当前 pageSize */
 const updateList = function () {
-  http.post("/api/email/list", {tag: tag, page_size: 15}).then((res: any) => {
+  emailService.getEmailList({tag: tag, page_size: pageSize.value, keyword: groupStore.keyword}).then((res: any) => {
     data.value = res.data.list || []
     totalPage.value = res.data.total_page || 0
   })
 }
 
+/** 刷新分组列表：通过 groupService 获取数据 */
 const updateGroupList = function () {
-  http.post("/api/group/list").then((res: any) => {
+  groupService.getGroupList().then((res: any) => {
     groupList.value = res.data || []
   })
 }
@@ -139,24 +191,36 @@ const rowClick = function (row: EmailListItem) {
   router.push("/detail/" + row.id)
 }
 
-const formatShortDate = (dateStr: string) => {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-  }
-  return d.toLocaleDateString([], {month: 'short', day: 'numeric'});
+/** el-table 选中项变化回调：同步维护 selectedRows 状态 */
+const handleSelectionChange = (rows: EmailListItem[]) => {
+  selectedRows.value = rows
 }
 
-const markRead = function () {
-  let rows: EmailListItem[] = taskTableDataRef.value?.getSelectionRows()
-  if (!rows || rows.length === 0) {
-    ElMessage.warning('Select emails first');
-    return;
+/** 全选/取消全选：通过 el-table 的 toggleAllSelection 方法实现 */
+const toggleSelectAll = (val: boolean | string) => {
+  if (val) {
+    data.value.forEach((row) => {
+      taskTableDataRef.value?.toggleRowSelection(row, true)
+    })
+  } else {
+    taskTableDataRef.value?.clearSelection()
   }
-  let ids = rows.map((e: EmailListItem) => e.id);
-  http.post("/api/email/read", {"ids": ids}).then((res: any) => {
+}
+
+/** 获取当前表格选中行的邮件 ID 列表（公共逻辑提取） */
+const getSelectedIds = (): number[] | null => {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('Select emails first');
+    return null;
+  }
+  return selectedRows.value.map((e: EmailListItem) => e.id);
+}
+
+/** 标记已读：通过 emailService 调用已读接口 */
+const markRead = function () {
+  const ids = getSelectedIds();
+  if (!ids) return;
+  emailService.markEmailsRead(ids).then((res: any) => {
     if (res.errorNo === 0) {
       updateList()
       ElMessage.success('Marked as read');
@@ -167,17 +231,12 @@ const markRead = function () {
 }
 
 const move = function (group_id: string, group_name: string) {
-  let rows: EmailListItem[] = taskTableDataRef.value?.getSelectionRows()
-  if (!rows || rows.length === 0) {
-    ElMessage.warning('Select emails first');
-    return;
-  }
-  let ids = rows.map((e: EmailListItem) => e.id);
-  
+  const ids = getSelectedIds();
+  if (!ids) return;
   ElMessageBox.confirm(lang.move_email_confirm, 'Warning', {
     confirmButtonText: 'OK', cancelButtonText: 'Cancel', type: 'warning'
   }).then(() => {
-    http.post("/api/email/move", {"group_id": group_id, "group_name": group_name, "ids": ids}).then((res: any) => {
+    emailService.moveEmails({group_id, group_name, ids}).then((res: any) => {
       if (res.errorNo === 0) {
         updateList()
         ElMessage.success('Move completed')
@@ -189,18 +248,16 @@ const move = function (group_id: string, group_name: string) {
 }
 
 const del = function () {
-  let rows: EmailListItem[] = taskTableDataRef.value?.getSelectionRows()
-  if (!rows || rows.length === 0) {
-    ElMessage.warning('Select emails first');
-    return;
-  }
-  let ids = rows.map((e: EmailListItem) => e.id);
-  let groupTag = JSON.parse(tag)
+  const ids = getSelectedIds();
+  if (!ids) return;
+
+  /** 通过 isTrashGroup 判断当前分组是否为垃圾箱（status === 3） */
+  const forcedDel = isTrashGroup(tag);
 
   ElMessageBox.confirm(lang.del_email_confirm, 'Warning', {
     confirmButtonText: 'OK', cancelButtonText: 'Cancel', type: 'warning'
   }).then(() => {
-    http.post("/api/email/del", {"ids": ids, "forcedDel": groupTag.status === 3}).then((res: any) => {
+    emailService.deleteEmails({ids, forcedDel}).then((res: any) => {
       if (res.errorNo === 0) {
         updateList()
         ElMessage.success('Deleted successfully')
@@ -215,17 +272,23 @@ const rowStyle = function () {
   return {'cursor': 'pointer'}
 }
 
+/** 翻页：通过 emailService 获取指定页数据，使用当前 pageSize */
 const pageChange = function (p: number) {
-  http.post("/api/email/list", {tag: tag, page_size: 15, current_page: p}).then((res: any) => {
+  emailService.getEmailList({tag: tag, page_size: pageSize.value, current_page: p, keyword: groupStore.keyword}).then((res: any) => {
     data.value = res.data.list || []
   })
 }
+
+/** 每页条数变更：重置到第 1 页并刷新列表 */
+const handlePageSizeChange = function () {
+  updateList()
+}
 </script>
 
-<!-- 样式改造: Docusaurus 风格, 移除 glassmorphism, 改为纯色卡片 | 日期: 20250425 -->
+<!-- 样式: Docusaurus BEM 风格 | 重构日期: 20260429 -->
 <style scoped>
-/* 列表视图容器：移除额外 padding，由 App.vue #body 统一控制间距 */
-.list-view-container {
+/* 列表视图容器 */
+.mail-list {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -237,7 +300,7 @@ const pageChange = function (p: number) {
   overflow: hidden;
 }
 
-.list-header {
+.mail-list__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -246,21 +309,21 @@ const pageChange = function (p: number) {
   gap: var(--ifm-spacing-sm);
 }
 
-.header-title h2 {
+.mail-list__title h2 {
   font-size: 24px;
   font-weight: 700;
   color: var(--ifm-color-content);
   margin: 0;
 }
 
-.header-actions {
+.mail-list__actions {
   display: flex;
   gap: var(--ifm-spacing-sm);
   align-items: center;
   flex-wrap: wrap;
 }
 
-.action-btn {
+.mail-list__action-btn {
   border-radius: var(--ifm-global-radius);
   border-color: var(--ifm-border-color);
   color: var(--ifm-color-content-secondary);
@@ -268,45 +331,45 @@ const pageChange = function (p: number) {
   font-weight: 500;
 }
 
-.action-btn:hover {
-  background-color: var(--pm-bg-hover);
+.mail-list__action-btn:hover {
+  background-color: var(--ifm-background-hover-color);
   color: var(--ifm-color-content);
   border-color: var(--ifm-border-color);
 }
 
-.compose-btn {
+.mail-list__compose-btn {
   border-radius: var(--ifm-global-radius);
   font-weight: 600;
   margin-left: var(--ifm-spacing-sm);
   padding-inline: 16px;
 }
 
-.list-content {
+.mail-list__content {
   flex-grow: 1;
   border-radius: var(--ifm-global-radius);
   border: 1px solid var(--ifm-border-color);
   overflow: hidden;
 }
 
-.modern-mail-table {
+.mail-list__table {
   width: 100%;
 }
 
-.modern-mail-table :deep(tr) {
+.mail-list__table :deep(tr) {
   transition: background-color var(--ifm-transition-fast);
 }
 
-.modern-mail-table :deep(tr:hover > td) {
-  background-color: var(--pm-row-hover) !important;
+.mail-list__table :deep(tr:hover > td) {
+  background-color: var(--ifm-row-hover-background) !important;
 }
 
-.modern-mail-table :deep(td) {
+.mail-list__table :deep(td) {
   padding: 10px 0;
   border-bottom: 1px solid var(--ifm-color-emphasis-300);
 }
 
 /* 未读圆点：自定义 CSS 圆点替代 el-badge，避免无子元素时定位异常 */
-.unread-dot {
+.mail-list__unread-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
@@ -315,21 +378,21 @@ const pageChange = function (p: number) {
   flex-shrink: 0;
 }
 
-.status-indicator {
+.mail-list__status {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 4px;
 }
 
-.mail-row-content {
+.mail-list__row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
 }
 
-.mail-main-info {
+.mail-list__row-main {
   display: flex;
   align-items: center;
   gap: var(--ifm-spacing-md);
@@ -338,7 +401,7 @@ const pageChange = function (p: number) {
 }
 
 /* 发件人：自适应宽度，窄屏可收缩 */
-.mail-sender {
+.mail-list__sender {
   min-width: 100px;
   max-width: 180px;
   font-weight: 500;
@@ -350,8 +413,8 @@ const pageChange = function (p: number) {
   flex-shrink: 1;
 }
 
-/* 主题：自适应宽度，取消固定 max-width */
-.mail-subject {
+/* 主题：自适应宽度 */
+.mail-list__subject {
   font-weight: 500;
   color: var(--ifm-color-content);
   white-space: nowrap;
@@ -364,7 +427,7 @@ const pageChange = function (p: number) {
 }
 
 /* 摘要：占据剩余空间 */
-.mail-snippet {
+.mail-list__snippet {
   color: var(--ifm-color-content-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -374,63 +437,102 @@ const pageChange = function (p: number) {
   min-width: 60px;
 }
 
-.mail-meta {
+.mail-list__meta {
   min-width: 80px;
   text-align: right;
   padding-right: var(--ifm-spacing-md);
 }
 
-.mail-date {
+.mail-list__date {
   font-size: 12px;
   color: var(--ifm-color-content-secondary);
 }
 
-.is-unread .mail-sender,
-.is-unread .mail-subject {
+/* 未读行加粗 */
+.mail-list__row--unread .mail-list__sender,
+.mail-list__row--unread .mail-list__subject {
   font-weight: 700;
   color: var(--ifm-color-content);
 }
 
-.is-unread .mail-date {
+.mail-list__row--unread .mail-list__date {
   color: var(--ifm-color-primary);
   font-weight: 600;
 }
 
-.pagination-wrapper {
+/* 全选复选框样式：添加边框以增强视觉辨识度 */
+.mail-list__select-all {
+  margin-right: var(--ifm-spacing-xs);
+  font-size: 14px;
+  color: var(--ifm-color-content-secondary);
+  border: 1px solid var(--ifm-border-color);
+  border-radius: var(--ifm-global-radius);
+  padding: 4px 8px;
+}
+
+/* 已选计数：高亮显示选中数量 */
+.mail-list__selected-count {
+  font-size: 13px;
+  color: var(--ifm-color-primary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 分页区域：支持每页条数选择器 */
+.mail-list__pagination {
   margin-top: var(--ifm-spacing-md);
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: var(--ifm-spacing-md);
   padding-bottom: var(--ifm-spacing-xs);
 }
 
+/* 每页条数选择器容器 */
+.mail-list__page-size {
+  display: flex;
+  align-items: center;
+  gap: var(--ifm-spacing-xs);
+}
+
+.mail-list__page-size-label {
+  font-size: 13px;
+  color: var(--ifm-color-content-secondary);
+  white-space: nowrap;
+}
+
+.mail-list__page-size-select {
+  width: 80px;
+}
+
 @media (max-width: 768px) {
-  .list-header {
+  .mail-list__header {
     flex-direction: column;
     align-items: flex-start;
   }
-  .header-actions {
+  .mail-list__actions {
     width: 100%;
     overflow-x: auto;
     padding-bottom: var(--ifm-spacing-xs);
   }
-  .mail-main-info {
+  .mail-list__row-main {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--ifm-spacing-xs);
   }
-  .mail-sender {
+  .mail-list__sender {
     width: 100%;
   }
-  .mail-subject {
+  .mail-list__subject {
     max-width: 100%;
   }
-  .mail-snippet {
+  .mail-list__snippet {
     display: none;
   }
-  .mail-row-content {
+  .mail-list__row {
     align-items: flex-start;
   }
-  .mail-meta {
+  .mail-list__meta {
     padding-top: 2px;
   }
 }

@@ -51,7 +51,6 @@
 
 <script setup lang="ts">
 import {EpMenu} from "vue-icons-plus/ep";
-import {ref, onMounted, onUnmounted} from 'vue'
 import SecuritySettings from '@/components/SecuritySettings.vue'
 import lang from '../i18n/i18n';
 import GroupSettings from './GroupSettings.vue';
@@ -59,35 +58,16 @@ import RuleSettings from './RuleSettings.vue';
 import UserManagement from './UserManagement.vue';
 import PluginSettings from './PluginSettings.vue';
 import {useGlobalStatusStore} from "@/stores/useGlobalStatusStore";
+import {useSettingsDrawer} from "@/composables/useSettingsDrawer";
+import {useIsMobile} from "@/composables/useIsMobile";
 import {Setting} from "@element-plus/icons-vue";
 
 const globalStatus = useGlobalStatusStore();
+const {openSettings} = useSettingsDrawer();
 const userInfos = globalStatus.userInfos;
 
-const isMobile = ref(window.innerWidth <= 768);
-
-const handleResize = () => {
-  isMobile.value = window.innerWidth <= 768;
-};
-
-/* 打开设置抽屉：先确保用户信息已加载 */
-const openSettings = () => {
-  if (Object.keys(globalStatus.userInfos).length === 0) {
-    globalStatus.init(() => {
-      globalStatus.settingsDrawerVisible = true;
-    });
-  } else {
-    globalStatus.settingsDrawerVisible = true;
-  }
-};
-
-onMounted(() => {
-  window.addEventListener('resize', handleResize);
-});
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize);
-});
+/** 通过 useIsMobile composable 获取响应式移动端状态（自动管理 resize 监听器） */
+const {isMobile} = useIsMobile();
 </script>
 
 <style scoped>
@@ -136,7 +116,7 @@ onUnmounted(() => {
 }
 
 .navbar__toggle:hover {
-  background: var(--pm-bg-hover);
+  background: var(--ifm-background-hover-color);
   color: var(--ifm-color-content);
 }
 
@@ -174,7 +154,7 @@ onUnmounted(() => {
 }
 
 .navbar__item:hover {
-  background: var(--pm-bg-hover);
+  background: var(--ifm-background-hover-color);
   color: var(--ifm-color-primary);
 }
 

@@ -1,6 +1,7 @@
 <template>
-  <div id="setup-main">
-    <el-steps :active="active" align-center finish-status="success" id="status">
+  <!-- 安装向导（Docusaurus BEM 风格） -->
+  <div class="setup">
+    <el-steps :active="active" align-center finish-status="success" class="setup__steps">
       <el-step :title="lang.welcome"/>
       <el-step :title="lang.setDatabase"/>
       <el-step :title="lang.setAdminPassword"/>
@@ -10,19 +11,19 @@
     </el-steps>
 
 
-    <div v-if="active === 0" class="ctn">
-      <div class="desc">
+    <div v-if="active === 0" class="setup__card">
+      <div class="setup__desc">
         <h2>{{ lang.tks_pmail }}</h2>
         <div style="margin-top: 10px;">{{ lang.guid_desc }}</div>
       </div>
     </div>
 
-    <div v-if="active === 1" class="ctn">
-      <div class="desc">
+    <div v-if="active === 1" class="setup__card">
+      <div class="setup__desc">
         <h2>{{ lang.select_db }}</h2>
         <div style="margin-top: 10px;">{{ lang.db_desc }}</div>
       </div>
-      <div class="form" style="width: 400px;">
+      <div class="setup__form" style="width: 400px;">
         <el-form label-width="120px">
           <el-form-item :label="lang.type">
             <el-select :placeholder="lang.db_select_ph" v-model="dbSettings.type"
@@ -51,12 +52,11 @@
     </div>
 
 
-    <div v-if="active === 2" class="ctn">
-      <div class="desc">
+    <div v-if="active === 2" class="setup__card">
+      <div class="setup__desc">
         <h2>{{ lang.setAdminPassword }}</h2>
-        <!-- <div style="margin-top: 10px;">{{ lang.domain_desc }}</div> -->
       </div>
-      <div class="form" style="width: 400px;">
+      <div class="setup__form" style="width: 400px;">
         <el-form label-width="120px">
 
           <el-form-item :label="lang.admin_account">
@@ -78,12 +78,11 @@
     </div>
 
 
-    <div v-if="active === 3" class="ctn">
-      <div class="desc">
+    <div v-if="active === 3" class="setup__card">
+      <div class="setup__desc">
         <h2>{{ lang.SetDomail }}</h2>
-        <!-- <div style="margin-top: 10px;">{{ lang.domain_desc }}</div> -->
       </div>
-      <div class="form" style="width: 400px;">
+      <div class="setup__form" style="width: 400px;">
         <el-form label-width="120px">
 
           <el-form-item :label="lang.smtp_domain">
@@ -112,13 +111,13 @@
       </div>
     </div>
 
-    <div v-if="active === 4" class="ctn_s">
+    <div v-if="active === 4" class="setup__card--stack">
 
-      <div class="desc">
+      <div class="setup__desc">
         <h2>{{ lang.setDNS }}</h2>
         <div style="margin-top: 10px;">{{ lang.dns_desc }}</div>
       </div>
-      <div class="form" width="600px" v-for="(info,domain) in dnsInfos" :key="info">
+      <div class="setup__form" width="600px" v-for="(info,domain) in dnsInfos" :key="info">
         <h3>{{ domain }}</h3>
         <el-table :data="info" border style="width: 100%">
           <el-table-column prop="host" label="HOSTNAME" width="110px">
@@ -151,12 +150,12 @@
     <el-alert :closable="false" title="Warning!" type="error" center
               v-if="active === 5 && sslSettings.type === '0' && port !== 80" :description="lang.autoSSLWarn"/>
 
-    <div v-if="active === 5" class="ctn">
-      <div class="desc">
+    <div v-if="active === 5" class="setup__card">
+      <div class="setup__desc">
         <h2>{{ lang.setSSL }}</h2>
         <div style="margin-top: 10px;">{{ lang.setSSL }}</div>
       </div>
-      <div class="form" width="600px">
+      <div class="setup__form" width="600px">
         <el-form label-width="120px">
           <el-form-item :label="lang.type">
             <el-select :placeholder="lang.ssl_auto" v-model="sslSettings.type" :disabled="dnsChecking">
@@ -215,7 +214,7 @@
     </div>
 
 
-    <el-button :element-loading-text="waitDesc" v-loading.fullscreen.lock="fullscreenLoading" id="next"
+    <el-button :element-loading-text="waitDesc" v-loading.fullscreen.lock="fullscreenLoading" class="setup__next-btn"
                style="margin-top: 12px" @click="next">{{
         lang.next
       }}
@@ -230,7 +229,7 @@ import {ElMessage} from 'element-plus'
 import lang from '../i18n/i18n';
 import axios from 'axios'
 import {Plus} from '@element-plus/icons-vue'
-import {http} from "@/utils/axios";
+import {setupService} from "@/services/setupService";
 import {useRoute} from 'vue-router'
 
 // 从 URL 读取 Setup Token，用于接口鉴权。
@@ -292,13 +291,8 @@ const setPassword = () => {
   if (adminSettings.password !== adminSettings.password2) {
     ElMessage.error(lang.err_pwd_diff)
   } else {
-    http.post("/api/setup", {
-      "action": "set",
-      "step": "password",
-      "account": adminSettings.account,
-      "password": adminSettings.password,
-      "token": setupToken.value
-    }).then((res: any) => {
+    /** 通过 setupService 保存管理员密码 */
+    setupService.setPassword(setupToken.value, adminSettings.account, adminSettings.password).then((res: any) => {
       if (res.errorNo !== 0) {
         ElMessage.error(res.errorMsg)
       } else {
@@ -310,7 +304,8 @@ const setPassword = () => {
 }
 
 const getPassword = () => {
-  http.post("/api/setup", {"action": "get", "step": "password", "token": setupToken.value}).then((res: any) => {
+  /** 通过 setupService 获取密码配置 */
+  setupService.getPasswordConfig(setupToken.value).then((res: any) => {
     if (res.errorNo !== 0) {
       ElMessage.error(res.errorMsg)
     } else {
@@ -327,7 +322,8 @@ const getPassword = () => {
 
 
 const getDbConfig = () => {
-  http.post("/api/setup", {"action": "get", "step": "database", "token": setupToken.value}).then((res: any) => {
+  /** 通过 setupService 获取数据库配置 */
+  setupService.getDatabaseConfig(setupToken.value).then((res: any) => {
     if (res.errorNo !== 0) {
       ElMessage.error(res.errorMsg)
     } else {
@@ -338,7 +334,8 @@ const getDbConfig = () => {
 }
 
 const getDomainConfig = () => {
-  http.post("/api/setup", {"action": "get", "step": "domain", "token": setupToken.value}).then((res: any) => {
+  /** 通过 setupService 获取域名配置 */
+  setupService.getDomainConfig(setupToken.value).then((res: any) => {
     if (res.errorNo !== 0) {
       ElMessage.error(res.errorMsg)
     } else {
@@ -356,13 +353,8 @@ const setDbConfig = () => {
     message: lang.err_db_dsn_empty,
     type: "error",
   });
-  http.post("/api/setup", {
-    "action": "set",
-    "step": "database",
-    "db_type": dbSettings.type,
-    "db_dsn": dbSettings.dsn,
-    "token": setupToken.value
-  }).then((res: any) => {
+  /** 通过 setupService 保存数据库配置 */
+  setupService.setDatabaseConfig(setupToken.value, dbSettings.type, dbSettings.dsn).then((res: any) => {
     if (res.errorNo !== 0) {
       ElMessage.error(res.errorMsg)
     } else {
@@ -372,8 +364,9 @@ const setDbConfig = () => {
   })
 }
 
+/** 通过 setupService 获取 DNS 配置 */
 const getDNSConfig = () => {
-  http.post("/api/setup", {"action": "get", "step": "dns", "token": setupToken.value}).then((res: any) => {
+  setupService.getDnsConfig(setupToken.value).then((res: any) => {
     if (res.errorNo !== 0) {
       ElMessage.error(res.errorMsg)
     } else {
@@ -383,8 +376,9 @@ const getDNSConfig = () => {
 }
 
 
+/** 通过 setupService 获取 SSL 配置 */
 const getSSLConfig = () => {
-  http.post("/api/setup", {"action": "get", "step": "ssl", "token": setupToken.value}).then((res: any) => {
+  setupService.getSslConfig(setupToken.value).then((res: any) => {
     if (res.errorNo !== 0) {
       ElMessage.error(res.errorMsg)
     } else {
@@ -409,14 +403,8 @@ const setSSLConfig = () => {
   }
 
 
-  http.post("/api/setup", {
-    "action": "set",
-    "step": "ssl",
-    "ssl_type": sslType,
-    "key_path": sslSettings.key_path,
-    "crt_path": sslSettings.crt_path,
-    "token": setupToken.value
-  }).then((res: any) => {
+  /** 通过 setupService 保存 SSL 配置 */
+  setupService.setSslConfig(setupToken.value, sslType, sslSettings.key_path, sslSettings.crt_path).then((res: any) => {
     if (res.errorNo !== 0) {
       fullscreenLoading.value = false;
       ElMessage.error(res.errorMsg)
@@ -453,15 +441,9 @@ const checkStatus = () => {
 }
 
 
+/** 通过 setupService 保存域名配置 */
 const setDomainConfig = () => {
-  http.post("/api/setup", { 
-    "action": "set",
-    "step": "domain",
-    "web_domain": domainSettings.web_domain,
-    "smtp_domain": domainSettings.smtp_domain,
-    "multi_domain": domainSettings.multi_domain.join(","),
-    "token": setupToken.value
-  }).then((res: any) => {
+  setupService.setDomainConfig(setupToken.value, domainSettings.web_domain, domainSettings.smtp_domain, domainSettings.multi_domain.join(",")).then((res: any) => {
     if (res.errorNo !== 0) {
       ElMessage.error(res.errorMsg)
     } else {
@@ -471,8 +453,9 @@ const setDomainConfig = () => {
   })
 }
 
+/** 通过 setupService 获取 SSL DNS 验证参数 */
 const getSSLDNSParams = () => {
-  http.post("/api/setup", {"action": "getParams", "step": "ssl", "token": setupToken.value}).then((res: any) => {
+  setupService.getSslDnsParams(setupToken.value).then((res: any) => {
     if (res.errorNo !== 0) {
       ElMessage.error(res.errorMsg)
     } else {
@@ -524,9 +507,10 @@ const next = () => {
 </script>
 
 
-<!-- 样式改造: Docusaurus 风格 | 日期: 20250425 -->
+<!-- 样式: Docusaurus BEM 风格 | 重构日期: 20260429 -->
 <style scoped>
-#setup-main {
+/* 安装向导页面 */
+.setup {
   width: 100%;
   height: 100%;
   background: var(--ifm-background-color);
@@ -537,19 +521,19 @@ const next = () => {
   overflow-y: auto;
 }
 
-.desc {
+.setup__desc {
   padding-right: var(--ifm-spacing-lg);
   margin-bottom: var(--ifm-spacing-md);
 }
 
-.desc h2 {
+.setup__desc h2 {
   font-size: 24px;
   font-weight: 700;
   color: var(--ifm-color-content);
 }
 
 /* 步骤条容器 */
-#status {
+.setup__steps {
   padding: var(--ifm-spacing-md) var(--ifm-spacing-lg);
   border-radius: var(--ifm-card-border-radius);
   background: var(--ifm-background-surface-color);
@@ -557,8 +541,8 @@ const next = () => {
   box-shadow: var(--ifm-global-shadow-lw);
 }
 
-/* 内容卡片 */
-.ctn {
+/* 内容卡片：横向布局 */
+.setup__card {
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -570,7 +554,8 @@ const next = () => {
   box-shadow: var(--ifm-global-shadow-lw);
 }
 
-.ctn_s {
+/* 内容卡片：纵向堆叠 */
+.setup__card--stack {
   display: flex;
   flex-direction: column;
   gap: var(--ifm-spacing-md);
@@ -582,7 +567,7 @@ const next = () => {
 }
 
 /* 下一步按钮 */
-#next {
+.setup__next-btn {
   align-self: flex-end;
   border-radius: var(--ifm-global-radius);
   padding: 10px 22px;

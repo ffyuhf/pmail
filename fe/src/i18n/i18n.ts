@@ -124,7 +124,10 @@ let lang = {
     "extensions_desc": "Manage available plugins and integrations.",
     "login_brand_desc": "Secure, elegant and distraction-free email experience for your team.",
     "login_subtitle": "Enter your credentials to access your mailbox",
-    "login_fill_required": "Please fill in both fields"
+    "login_fill_required": "Please fill in both fields",
+    "select_all": "Select All",
+    "selected_count": "selected",
+    "per_page": "Per Page"
 };
 
 
@@ -254,7 +257,10 @@ const zhCN = {
     "extensions_desc": "管理可用的扩展插件。",
     "login_brand_desc": "为你的团队提供安全、优雅且专注的邮件体验。",
     "login_subtitle": "请输入凭据以访问你的邮箱",
-    "login_fill_required": "请填写账号和密码"
+    "login_fill_required": "请填写账号和密码",
+    "select_all": "全选",
+    "selected_count": "已选",
+    "per_page": "每页显示"
 }
 
 const browserLang = (navigator.languages && navigator.languages[0]) || navigator.language || "en";

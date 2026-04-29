@@ -1,9 +1,5 @@
 <template>
-  <div class="settings-card">
-    <div class="settings-header">
-      <h3>{{ lang.extensions }}</h3>
-      <p class="settings-desc">{{ lang.extensions_desc }}</p>
-    </div>
+  <SettingsCard :title="lang.extensions" :description="lang.extensions_desc">
 
     <div class="plugin-container">
       <el-tabs class="custom-tabs">
@@ -19,17 +15,19 @@
         </el-tab-pane>
       </el-tabs>
     </div>
-  </div>
+  </SettingsCard>
 </template>
 
 <script setup lang="ts">
 import {reactive} from 'vue'
-import {http} from "@/utils/axios";
+import {pluginService} from "@/services/pluginService";
 import lang from '../i18n/i18n';
+import SettingsCard from "@/components/settings/SettingsCard.vue";
 
 const pluginList = reactive<Record<string, string>>({})
 
-http.get('/api/plugin/list').then((res: any) => {
+/** 通过 pluginService 获取已安装插件列表 */
+pluginService.getPluginList().then((res: any) => {
   if (res.data != null && res.data.length > 0) {
     for (let i = 0; i < res.data.length; i++) {
       let name = res.data[i];
@@ -40,42 +38,20 @@ http.get('/api/plugin/list').then((res: any) => {
 </script>
 
 <style scoped>
-.settings-card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.settings-header {
-  margin-bottom: 24px;
-}
-
-.settings-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--pm-text-primary);
-  margin: 0 0 8px 0;
-}
-
-.settings-desc {
-  font-size: 14px;
-  color: var(--pm-text-secondary);
-  margin: 0;
-}
 
 .plugin-container {
   flex-grow: 1;
-  border: 1px solid var(--pm-border-color);
-  border-radius: var(--pm-radius-sm);
-  background: var(--pm-bg-secondary);
+  border: 1px solid var(--ifm-border-color);
+  border-radius: var(--ifm-global-radius);
+  background: var(--ifm-background-surface-color);
   overflow: hidden;
 }
 
 .custom-tabs :deep(.el-tabs__header) {
   margin-bottom: 0;
-  background: var(--pm-bg-primary);
+  background: var(--ifm-background-color);
   padding: 0 16px;
-  border-bottom: 1px solid var(--pm-border-color);
+  border-bottom: 1px solid var(--ifm-border-color);
 }
 
 .custom-tabs :deep(.el-tabs__content) {
