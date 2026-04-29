@@ -65,7 +65,7 @@ func Init() {
 		stopCh: make(chan struct{}),
 	}
 	go globalInstance.cleanupLoop()
-	log.Info("Rate limiter initialized")
+	log.Info("[RATE_LIMIT] 速率限制器已初始化")
 }
 
 // ipKey 返回 IP 地址的 sync.Map 键。
@@ -98,7 +98,7 @@ func Check(ip, account string) error {
 		rec := globalInstance.getOrCreate(ipKey(ip))
 		if !rec.lockedUntil.IsZero() && now.Before(rec.lockedUntil) {
 			remaining := time.Until(rec.lockedUntil).Round(time.Second)
-			return fmt.Errorf("IP %s is locked due to too many failed attempts, try again in %v", ip, remaining)
+			return fmt.Errorf("IP %s 因失败次数过多已被锁定，请 %v 后重试", ip, remaining)
 		}
 	}
 
@@ -107,7 +107,7 @@ func Check(ip, account string) error {
 		rec := globalInstance.getOrCreate(accountKey(account))
 		if !rec.lockedUntil.IsZero() && now.Before(rec.lockedUntil) {
 			remaining := time.Until(rec.lockedUntil).Round(time.Second)
-			return fmt.Errorf("account %s is locked due to too many failed attempts, try again in %v", account, remaining)
+			return fmt.Errorf("账户 %s 因失败次数过多已被锁定，请 %v 后重试", account, remaining)
 		}
 	}
 
@@ -166,7 +166,7 @@ func RecordFailure(ip, account string) {
 		rec.lastAttempt = now
 		if rec.failures >= MaxIPFailures {
 			rec.lockedUntil = now.Add(IPLockoutDuration)
-			log.Warnf("Rate limit: IP %s locked for %v after %d failed attempts", ip, IPLockoutDuration, rec.failures)
+			log.Warnf("[RATE_LIMIT] IP %s 已锁定 时长=%v 失败次数=%d", ip, IPLockoutDuration, rec.failures)
 		}
 	}
 
@@ -177,7 +177,7 @@ func RecordFailure(ip, account string) {
 		rec.lastAttempt = now
 		if rec.failures >= MaxAccountFailures {
 			rec.lockedUntil = now.Add(AccountLockoutDuration)
-			log.Warnf("Rate limit: account %s locked for %v after %d failed attempts", account, AccountLockoutDuration, rec.failures)
+			log.Warnf("[RATE_LIMIT] 账户 %s 已锁定 时长=%v 失败次数=%d", account, AccountLockoutDuration, rec.failures)
 		}
 	}
 }

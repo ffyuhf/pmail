@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/ffyuhf/pmail/config"
 	"github.com/ffyuhf/pmail/listen/cron_server"
 	"github.com/ffyuhf/pmail/res_init"
@@ -22,13 +24,18 @@ func main() {
 		version = "TestVersion"
 	}
 
-	log.Infoln("*******************************************************************")
-	log.Infof("***\tServer Start Success \n")
-	log.Infof("***\tServer Version: %s \n", version)
-	log.Infof("***\tGit Commit Hash: %s ", gitHash)
-	log.Infof("***\tBuild Date: %s ", buildTime)
-	log.Infof("***\tBuild GoLang Version: %s ", goVersion)
-	log.Infoln("*******************************************************************")
+	// 服务器启动横幅：输出构建版本信息，便于运维排查问题
+	banner := fmt.Sprintf(
+		"*******************************************************************\n"+
+			"***        服务启动成功\n"+
+			"***        服务版本: %s\n"+
+			"***        Git提交哈希: %s\n"+
+			"***        构建日期: %s\n"+
+			"***        Go版本: %s\n"+
+			"*******************************************************************",
+		version, gitHash, buildTime, goVersion,
+	)
+	log.Info(banner)
 
 	// 定时任务启动
 	go cron_server.Start()
@@ -36,6 +43,5 @@ func main() {
 	// 核心服务启动
 	res_init.Init(version)
 
-	log.Warnf("Server Stoped \n")
-
+	log.Info("服务已停止")
 }
