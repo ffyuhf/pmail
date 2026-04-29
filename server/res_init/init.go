@@ -73,12 +73,13 @@ func Init(serverVersion string) {
 		// 启动 IMAP 服务器
 		go imap_server.StarTLS()
 
+		// 配置信息以 debug 级别输出，避免启动日志中大量配置项干扰运维
 		configStr, _ := json.Marshal(config.Instance)
-		log.Warnf("Config File Info:  %s", configStr)
+		log.Debugf("配置文件信息: %s", configStr)
 
 		select {
 		case <-signal.RestartChan:
-			log.Infof("Server Restart!")
+			log.Info("[SYSTEM] 服务重启中...")
 			smtp_server.Stop()
 			http_server.HttpsStop()
 			http_server.HttpStop()
@@ -86,7 +87,7 @@ func Init(serverVersion string) {
 			imap_server.Stop()
 			hooks.Stop()
 		case <-signal.StopChan:
-			log.Infof("Server Stop!")
+			log.Info("[SYSTEM] 服务停止中...")
 			smtp_server.Stop()
 			http_server.HttpsStop()
 			http_server.HttpStop()
@@ -95,7 +96,7 @@ func Init(serverVersion string) {
 			hooks.Stop()
 			return
 		}
-		log.Infof("Server Stop Success!")
+		log.Info("[SYSTEM] 服务已停止，等待5秒后重启")
 		time.Sleep(5 * time.Second)
 
 	}
@@ -137,7 +138,7 @@ func waitHTTPReady() {
 		resp, err := http.Get(url)
 		if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
 			resp.Body.Close()
-			log.Infof("HTTP ready: %s", url)
+			log.Infof("[HTTP] HTTP服务就绪: %s", url)
 			return
 		}
 		if resp != nil {
@@ -145,5 +146,5 @@ func waitHTTPReady() {
 		}
 		time.Sleep(1 * time.Second)
 	}
-	log.Warnf("HTTP not ready after 90s, skipping immediate SSL update")
+	log.Warnf("[HTTP] HTTP服务90秒内未就绪，跳过立即SSL更新")
 }

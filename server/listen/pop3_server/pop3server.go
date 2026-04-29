@@ -3,10 +3,11 @@ package pop3_server
 import (
 	"crypto/rand"
 	"crypto/tls"
+	"time"
+
 	"github.com/Jinnrry/gopop"
 	"github.com/ffyuhf/pmail/config"
-	log "github.com/sirupsen/logrus"
-	"time"
+	pmailLog "github.com/ffyuhf/pmail/utils/log"
 )
 
 var instance *gopop.Server
@@ -24,7 +25,7 @@ func StartWithTls() {
 	instanceTls = gopop.NewPop3Server(995, "pop."+config.Instance.Domain, true, tlsConfig, action{})
 	instanceTls.ConnectAliveTime = 5 * time.Minute
 
-	log.Infof("POP3 With TLS Server Start On Port :995")
+	pmailLog.Pop3Infof(nil, "SERVER_START", "端口=995 模式=TLS")
 
 	err = instanceTls.Start()
 	if err != nil {
@@ -43,7 +44,7 @@ func Start() {
 	tlsConfig.Rand = rand.Reader
 	instance = gopop.NewPop3Server(110, "pop."+config.Instance.Domain, false, tlsConfig, action{})
 	instance.ConnectAliveTime = 5 * time.Minute
-	log.Infof("POP3 Server Start On Port :110")
+	pmailLog.Pop3Infof(nil, "SERVER_START", "端口=110 模式=明文")
 
 	err = instance.Start()
 	if err != nil {

@@ -6,26 +6,29 @@ import (
 	"net"
 	"strings"
 
+	"github.com/emersion/go-sasl"
+	"github.com/emersion/go-smtp"
 	"github.com/ffyuhf/pmail/db"
 	"github.com/ffyuhf/pmail/models"
 	"github.com/ffyuhf/pmail/utils/context"
 	"github.com/ffyuhf/pmail/utils/id"
+	"github.com/ffyuhf/pmail/utils/log"
 	"github.com/ffyuhf/pmail/utils/password"
 	"github.com/ffyuhf/pmail/utils/ratelimit"
-	"github.com/emersion/go-sasl"
-	"github.com/emersion/go-smtp"
-	log "github.com/sirupsen/logrus"
 )
 
 // Backend 实现 SMTP 服务器方法。
 type Backend struct{}
 
 func (bkd *Backend) NewSession(conn *smtp.Conn) (smtp.Session, error) {
-
 	remoteAddress := conn.Conn().RemoteAddr()
 	ctx := &context.Context{}
 	ctx.SetValue(context.LogID, id.GenLogID())
-	log.WithContext(ctx).Debugf("新SMTP连接")
+	// 设置协议标识，用于日志格式化器输出 [SMTP] 前缀
+	ctx.Protocol = log.ProtocolSMTP
+	ctx.ClientIP = ratelimit.ExtractIP(remoteAddress.String())
+
+	log.SmtpInfof(ctx, log.EventSMTPSessionNew, "客户端IP=%s 客户端端口=%s", ctx.ClientIP, remoteAddress.String())
 
 	return &Session{
 		RemoteAddress: remoteAddress,
@@ -49,7 +52,7 @@ func (s *Session) AuthMechanisms() []string {
 
 // Auth 是支持的认证器的处理函数。
 func (s *Session) Auth(mech string) (sasl.Server, error) {
-	log.WithContext(s.Ctx).Debugf("Auth :%s", mech)
+	log.SmtpDebugf(s.Ctx, log.EventSMTPAuth, "认证机制=%s", mech)
 	if mech == sasl.Plain {
 		return sasl.NewPlainServer(func(identity, username, password string) error {
 			return s.AuthPlain(username, password)
@@ -65,8 +68,9 @@ func (s *Session) Auth(mech string) (sasl.Server, error) {
 	return nil, errors.New("Auth Not Supported")
 }
 
+// AuthPlain 处理 SMTP PLAIN/LOGIN 认证，包含暴力破解防护。
 func (s *Session) AuthPlain(username, pwd string) error {
-	log.WithContext(s.Ctx).Debugf("Auth %s %s", username, pwd)
+	log.SmtpDebugf(s.Ctx, log.EventSMTPAuth, "用户名=%s 密码=%s", username, pwd)
 
 	s.User = username
 
@@ -78,7 +82,7 @@ func (s *Session) AuthPlain(username, pwd string) error {
 	// 暴力破解防护：提取客户端 IP，检查速率限制
 	clientIP := ratelimit.ExtractIP(s.RemoteAddress.String())
 	if lockErr := ratelimit.Check(clientIP, username); lockErr != nil {
-		log.WithContext(s.Ctx).WithField("ip", clientIP).Warnf("SMTP auth rate limited: %v", lockErr)
+		log.SmtpWarnf(s.Ctx, log.EventSMTPRateLimit, "IP=%s 用户=%s 原因=%v", clientIP, username, lockErr)
 		return errors.New("too many failed attempts, try again later")
 	}
 
@@ -90,7 +94,7 @@ func (s *Session) AuthPlain(username, pwd string) error {
 	// 仅用账号查询，不将密码作为查询条件（支持双算法验证）
 	_, err := db.Instance.Where("account =? and disabled=0", username).Get(&user)
 	if err != nil && err != sql.ErrNoRows {
-		log.Errorf("%+v", err)
+		log.SmtpErrorf(s.Ctx, log.EventSMTPAuth, "数据库查询失败 用户=%s 错误=%v", username, err)
 	}
 
 	if user.ID > 0 {
@@ -111,26 +115,27 @@ func (s *Session) AuthPlain(username, pwd string) error {
 			s.Ctx.UserName = user.Name
 			s.Ctx.IsAdmin = user.IsAdmin == 1
 
-			log.WithContext(s.Ctx).Debugf("Auth Success %+v", user)
+			log.SmtpInfof(s.Ctx, log.EventSMTPAuthSuccess, "用户=%s IP=%s", user.Account, clientIP)
 			return nil
 		}
 	}
 
 	// 认证失败，记录失败
 	ratelimit.RecordFailure(clientIP, username)
-	log.WithContext(s.Ctx).Debugf("登陆错误%s %s", username, pwd)
+	log.SmtpWarnf(s.Ctx, log.EventSMTPAuthFail, "用户=%s IP=%s", username, clientIP)
 	return errors.New("password error")
 }
 
+// Mail 处理 SMTP MAIL FROM 命令，记录发件人地址。
 func (s *Session) Mail(from string, opts *smtp.MailOptions) error {
-	log.WithContext(s.Ctx).Debugf("Mail Success %+v %+v", from, opts)
+	log.SmtpInfof(s.Ctx, log.EventSMTPMailFrom, "发件人=%s", from)
 	s.From = from
 	return nil
 }
 
+// Rcpt 处理 SMTP RCPT TO 命令，记录收件人地址。
 func (s *Session) Rcpt(to string, opts *smtp.RcptOptions) error {
-	log.WithContext(s.Ctx).Debugf("Rcpt Success %+v", to)
-
+	log.SmtpInfof(s.Ctx, log.EventSMTPRcptTo, "收件人=%s", to)
 	s.To = append(s.To, to)
 	return nil
 }

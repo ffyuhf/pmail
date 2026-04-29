@@ -6,6 +6,7 @@ import (
 
 	"github.com/emersion/go-smtp"
 	"github.com/ffyuhf/pmail/config"
+	pmailLog "github.com/ffyuhf/pmail/utils/log"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,7 +37,7 @@ func StartWithTLSNew() {
 	// 配置 STARTTLS 的 TLS 支持
 	instanceTlsNew.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cer}}
 
-	log.Println("Starting Smtp With STARTTLS Server Port:", instanceTlsNew.Addr)
+	pmailLog.SmtpInfof(nil, "SERVER_START", "端口=587 模式=STARTTLS")
 	// 587端口使用STARTTLS（先明文连接，再升级TLS），而非隐式TLS
 	if err := instanceTlsNew.ListenAndServe(); err != nil {
 		log.Fatal(err)
@@ -66,7 +67,7 @@ func StartWithTLS() {
 	// 配置 TLS 支持
 	instanceTls.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cer}}
 
-	log.Println("Starting Smtp With SSL Server Port:", instanceTls.Addr)
+	pmailLog.SmtpInfof(nil, "SERVER_START", "端口=465 模式=SSL")
 	if err := instanceTls.ListenAndServeTLS(); err != nil {
 		log.Fatal(err)
 	}
@@ -95,7 +96,7 @@ func Start() {
 	// 配置 TLS 支持
 	instance.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cer}}
 
-	log.Println("Starting Smtp Server Port:", instance.Addr)
+	pmailLog.SmtpInfof(nil, "SERVER_START", "端口=25 模式=明文")
 	if err := instance.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}

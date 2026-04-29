@@ -4,12 +4,12 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/emersion/go-imap/v2"
 	"github.com/ffyuhf/pmail/db"
 	"github.com/ffyuhf/pmail/models"
+	pmailLog "github.com/ffyuhf/pmail/utils/log"
 	pmailpassword "github.com/ffyuhf/pmail/utils/password"
 	"github.com/ffyuhf/pmail/utils/ratelimit"
-	"github.com/emersion/go-imap/v2"
-	log "github.com/sirupsen/logrus"
 )
 
 // Login 处理 IMAP LOGIN 命令，包含暴力破解防护。
@@ -23,7 +23,7 @@ func (s *serverSession) Login(username, pwd string) error {
 
 	// 暴力破解防护：检查速率限制
 	if lockErr := ratelimit.Check(s.remoteAddr, username); lockErr != nil {
-		log.WithField("ip", s.remoteAddr).Warnf("IMAP login rate limited: %v", lockErr)
+		pmailLog.ImapWarnf(s.ctx, pmailLog.EventIMAPRateLimit, "IP=%s 用户=%s 原因=%v", s.remoteAddr, username, lockErr)
 		return &imap.Error{
 			Type: imap.StatusResponseTypeNo,
 			Text: "too many failed attempts, try again later",
@@ -39,7 +39,7 @@ func (s *serverSession) Login(username, pwd string) error {
 	_, err := db.Instance.Where("account =? and disabled=0", username).Get(&user)
 	if err != nil {
 		ratelimit.RecordFailure(s.remoteAddr, username)
-		log.Errorf("%+v", err)
+		pmailLog.ImapErrorf(s.ctx, pmailLog.EventIMAPAuthFail, "用户=%s 数据库错误=%v", username, err)
 		return &imap.Error{
 			Type: imap.StatusResponseTypeNo,
 			Text: "login failed",
@@ -65,12 +65,14 @@ func (s *serverSession) Login(username, pwd string) error {
 			s.ctx.IsAdmin = user.IsAdmin == 1
 
 			s.status = AUTHORIZED
+			pmailLog.ImapInfof(s.ctx, pmailLog.EventIMAPAuthSuccess, "用户=%s IP=%s", user.Account, s.remoteAddr)
 			return nil
 		}
 	}
 
 	// 认证失败，记录失败
 	ratelimit.RecordFailure(s.remoteAddr, username)
+	pmailLog.ImapWarnf(s.ctx, pmailLog.EventIMAPAuthFail, "用户=%s IP=%s", username, s.remoteAddr)
 	return errors.New("login failed")
 }
 

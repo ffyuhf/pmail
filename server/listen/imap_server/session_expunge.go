@@ -1,13 +1,14 @@
 package imap_server
 
 import (
-	"github.com/ffyuhf/pmail/services/del_email"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapserver"
+	"github.com/ffyuhf/pmail/services/del_email"
+	pmailLog "github.com/ffyuhf/pmail/utils/log"
 	"github.com/spf13/cast"
-	"log/slog"
 )
 
+// Expunge 处理 IMAP EXPUNGE 命令，永久删除标记为已删除的邮件。
 func (s *serverSession) Expunge(w *imapserver.ExpungeWriter, uids *imap.UIDSet) error {
 	if uids == nil && len(s.deleteUidList) == 0 {
 		return nil
@@ -32,7 +33,7 @@ func (s *serverSession) Expunge(w *imapserver.ExpungeWriter, uids *imap.UIDSet) 
 		return nil
 	}
 
-	slog.Debug("DeleteUidList:", slog.Any("uidList", uidList))
+	pmailLog.ImapDebugf(s.ctx, pmailLog.EventIMAPExpunge, "UID列表=%v", uidList)
 
 	err := del_email.DelByUID(s.ctx, uidList)
 	s.deleteUidList = []int{}

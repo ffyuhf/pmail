@@ -4,10 +4,10 @@ import (
 	"crypto/tls"
 	"os"
 
-	"github.com/ffyuhf/pmail/config"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapserver"
-	log "github.com/sirupsen/logrus"
+	"github.com/ffyuhf/pmail/config"
+	pmailLog "github.com/ffyuhf/pmail/utils/log"
 )
 
 var instanceTLS *imapserver.Server
@@ -52,7 +52,7 @@ func StarTLS() {
 	}
 
 	instanceTLS = imapserver.New(option)
-	log.Infof("IMAP With TLS Server Start On Port :993")
+	pmailLog.ImapInfof(nil, pmailLog.EventIMAPSessionNew, "IMAP服务启动 端口=993 模式=TLS")
 	if err := instanceTLS.ListenAndServeTLS(":993"); err != nil {
 		panic(err)
 	}

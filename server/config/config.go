@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -127,23 +128,69 @@ var Instance *Config = &Config{}
 type logFormatter struct {
 }
 
-// Format 定义日志输出格式
+// Format 定义日志输出格式：[级别][时间][LogID][协议][文件:行号]消息
+// 协议字段从 context.Context 中读取，若无协议信息则省略该段。
+// 调用栈跳帧：跳过 logrus 内部和 utils/log/log.go 包装层，显示真实业务调用者。
 func (l *logFormatter) Format(entry *log.Entry) ([]byte, error) {
 	b := bytes.Buffer{}
 
+	// [级别]
 	b.WriteString(fmt.Sprintf("[%s]", entry.Level.String()))
+	// [时间]
 	b.WriteString(fmt.Sprintf("[%s]", entry.Time.Format("2006-01-02 15:04:05")))
+	// [LogID] 和 [协议] 从上下文中提取，无上下文时显示 [SYSTEM]
 	if entry.Context != nil {
 		ctx := entry.Context.(*context.Context)
 		if ctx != nil {
-			b.WriteString(fmt.Sprintf("[%s]", ctx.GetValue(context.LogID)))
+			logID := fmt.Sprintf("%v", ctx.GetValue(context.LogID))
+			if logID == "" || logID == "<nil>" {
+				logID = "SYSTEM"
+			}
+			b.WriteString(fmt.Sprintf("[%s]", logID))
+			if ctx.Protocol != "" {
+				b.WriteString(fmt.Sprintf("[%s]", ctx.Protocol))
+			}
 		}
+	} else {
+		b.WriteString("[SYSTEM]")
 	}
-	b.WriteString(fmt.Sprintf("[%s:%d]", entry.Caller.File, entry.Caller.Line))
+	// [文件:行号] — 跳过 log.go 包装层和 logrus 内部帧，显示真实调用者
+	b.WriteString(fmt.Sprintf("[%s]", getRealCaller()))
+	// 消息内容
 	b.WriteString(entry.Message)
 
 	b.WriteString("\n")
 	return b.Bytes(), nil
+}
+
+// getRealCaller 遍历调用栈，跳过 logrus 内部和 utils/log/log.go 包装函数，
+// 返回第一个真实业务代码的 "文件:行号"。未找到时返回 "?"。
+func getRealCaller() string {
+	pcs := make([]uintptr, 32)
+	n := runtime.Callers(2, pcs)
+	frames := runtime.CallersFrames(pcs[:n])
+
+	for {
+		frame, more := frames.Next()
+		if !more {
+			break
+		}
+		// 跳过 logrus 内部帧
+		if strings.Contains(frame.File, "sirupsen/logrus") {
+			continue
+		}
+		// 跳过我们的日志包装层
+		if strings.Contains(frame.File, "utils/log/log.go") {
+			continue
+		}
+		// 跳过 config.go 中的 Format/getRealCaller
+		if strings.Contains(frame.File, "config/config.go") {
+			continue
+		}
+		// 找到真实调用者
+		return fmt.Sprintf("%s:%d", frame.File, frame.Line)
+	}
+	return "?"
 }
 func Init() {
 	var cfgData []byte
@@ -158,7 +205,7 @@ func Init() {
 	} else {
 		cfgData, err = os.ReadFile(ROOT_PATH + "./config/config.json")
 		if err != nil {
-			log.Errorf("config file not found,%s", err.Error())
+			log.Errorf("配置文件未找到: %s", err.Error())
 			return
 		}
 	}
@@ -259,20 +306,20 @@ func ReadConfig() (*Config, error) {
 		_ = os.MkdirAll(ROOT_PATH+"/config/", 0700)
 		err := os.WriteFile(ROOT_PATH+"./config/config.json", bytes, 0600)
 		if err != nil {
-			log.Errorf("Write Config Error:%s", err.Error())
+			log.Errorf("写入配置失败: %s", err.Error())
 			return nil, errors.Wrap(err)
 		}
 	} else {
 		cfgData, err := os.ReadFile(ROOT_PATH + "./config/config.json")
 		if err != nil {
-			log.Errorf("Read Config Error:%s", err.Error())
+			log.Errorf("读取配置失败: %s", err.Error())
 			return nil, errors.Wrap(err)
 		}
 
 		err = json.Unmarshal(cfgData, &configData)
 		configData.fixPath()
 		if err != nil {
-			log.Errorf("Read Config Unmarshal Error:%s", err.Error())
+			log.Errorf("配置解析失败: %s", err.Error())
 			return nil, errors.Wrap(err)
 		}
 	}

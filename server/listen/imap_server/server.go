@@ -4,13 +4,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapserver"
 	"github.com/ffyuhf/pmail/utils/context"
 	"github.com/ffyuhf/pmail/utils/id"
+	pmailLog "github.com/ffyuhf/pmail/utils/log"
 	"github.com/ffyuhf/pmail/utils/ratelimit"
-	"github.com/emersion/go-imap/v2"
 	log "github.com/sirupsen/logrus"
-
-	"github.com/emersion/go-imap/v2/imapserver"
 )
 
 // Server 是一个服务器实例。
@@ -44,10 +44,15 @@ type serverSession struct {
 	remoteAddr     string // 客户端 IP 地址，用于暴力破解防护
 }
 
-// NewSession 创建新的 IMAP 会话，从连接中提取远程 IP。
+// NewSession 创建新的 IMAP 会话，设置协议标识并记录连接事件。
 func (s *Server) NewSession(remoteAddr string) imapserver.Session {
 	tc := &context.Context{}
 	tc.SetValue(context.LogID, id.GenLogID())
+	// 设置协议标识，用于日志格式化器输出 [IMAP] 前缀
+	tc.Protocol = pmailLog.ProtocolIMAP
+	tc.ClientIP = ratelimit.ExtractIP(remoteAddr)
+
+	pmailLog.ImapInfof(tc, pmailLog.EventIMAPSessionNew, "客户端IP=%s", tc.ClientIP)
 
 	return &serverSession{
 		server:      s,
@@ -57,7 +62,10 @@ func (s *Server) NewSession(remoteAddr string) imapserver.Session {
 	}
 }
 
+// Close 关闭 IMAP 会话，记录会话持续时长。
 func (s *serverSession) Close() error {
+	duration := time.Since(s.connectTime)
+	pmailLog.ImapInfof(s.ctx, pmailLog.EventIMAPSessionClose, "用户=%s 持续时间=%v", s.ctx.UserAccount, duration)
 	return nil
 }
 
@@ -70,7 +78,7 @@ func (s *serverSession) Unsubscribe(mailbox string) error {
 }
 
 func (s *serverSession) Append(mailbox string, r imap.LiteralReader, options *imap.AppendOptions) (*imap.AppendData, error) {
-	log.WithContext(s.ctx).Errorf("Append Not Implemented")
+	log.WithContext(s.ctx).Errorf("Append 功能未实现")
 	return nil, nil
 }
 

@@ -18,40 +18,41 @@ import (
 	"github.com/ffyuhf/pmail/utils/context"
 	"github.com/ffyuhf/pmail/utils/errors"
 	"github.com/ffyuhf/pmail/utils/id"
+	pmailLog "github.com/ffyuhf/pmail/utils/log"
 	"github.com/ffyuhf/pmail/utils/password"
 	"github.com/ffyuhf/pmail/utils/ratelimit"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
 )
 
 type action struct {
 }
 
-// Custom 非标准命令
-func (a action) Custom(session *gopop.Session, cmd string, args []string) ([]string, error) {
+// ensureCtx 确保 POP3 会话上下文存在，并设置协议标识和客户端 IP。
+// POP3 协议的日志前缀为 [POP3]，便于日志过滤。
+func ensureCtx(session *gopop.Session) *context.Context {
 	if session.Ctx == nil {
 		tc := &context.Context{}
 		tc.SetValue(context.LogID, id.GenLogID())
+		tc.Protocol = pmailLog.ProtocolPOP3
+		if session.Conn != nil {
+			tc.ClientIP = ratelimit.ExtractIP(session.Conn.RemoteAddr().String())
+		}
 		session.Ctx = tc
 	}
+	return session.Ctx.(*context.Context)
+}
 
-	log.WithContext(session.Ctx).Debugf("not supported cmd request! cmd:%s args:%v", cmd, args)
+// Custom 处理非标准 POP3 命令。
+func (a action) Custom(session *gopop.Session, cmd string, args []string) ([]string, error) {
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=%s 参数=%v 原因=不支持", cmd, args)
 	return nil, errors2.New("not supported cmd request")
 }
 
-// Capa 说明服务端支持的命令列表
+// Capa 返回服务端支持的 POP3 命令列表。
 func (a action) Capa(session *gopop.Session) ([]string, error) {
-	if session.Ctx == nil {
-		tc := &context.Context{}
-		tc.SetValue(context.LogID, id.GenLogID())
-		session.Ctx = tc
-	}
-
-	if session.InTls {
-		log.WithContext(session.Ctx).Debugf("POP3 CMD: CAPA With Tls")
-	} else {
-		log.WithContext(session.Ctx).Debugf("POP3 CMD: CAPA Without Tls")
-	}
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=CAPA TLS=%v", session.InTls)
 
 	ret := []string{
 		"USER",
@@ -71,27 +72,19 @@ func (a action) Capa(session *gopop.Session) ([]string, error) {
 		ret = append(ret, "STLS")
 	}
 
-	log.WithContext(session.Ctx).Debugf("CAPA \n %+v", ret)
-
 	return ret, nil
 }
 
-// User 提交登陆的用户名
+// User 处理 POP3 USER 命令，提交登录用户名。
 func (a action) User(session *gopop.Session, username string) error {
-	if session.Ctx == nil {
-		tc := &context.Context{}
-		tc.SetValue(context.LogID, id.GenLogID())
-		session.Ctx = tc
-	}
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: USER, Args:%s", username)
+	ctx := ensureCtx(session)
 
 	infos := strings.Split(username, "@")
 	if len(infos) > 1 {
 		username = infos[0]
 	}
 
-	log.WithContext(session.Ctx).Debugf("POP3 User %s", username)
-
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=USER 用户=%s", username)
 	session.User = username
 	return nil
 }
@@ -104,20 +97,23 @@ func pop3ClientIP(session *gopop.Session) string {
 	return ""
 }
 
-// Pass 提交密码验证，包含暴力破解防护
+// Pass 处理 POP3 PASS 命令，提交密码验证，包含暴力破解防护。
+// 安全策略：拒绝非TLS连接上的认证，防止凭据明文传输（与SMTP AllowInsecureAuth=false对齐）。
 func (a action) Pass(session *gopop.Session, pwd string) error {
-	if session.Ctx == nil {
-		tc := &context.Context{}
-		tc.SetValue(context.LogID, id.GenLogID())
-		session.Ctx = tc
+	ctx := ensureCtx(session)
+
+	// 强制TLS认证：非加密连接上拒绝提交密码，客户端必须先执行STLS升级为TLS
+	if !session.InTls {
+		pmailLog.Pop3Warnf(ctx, pmailLog.EventPOP3AuthRejected, "用户=%s 原因=明文连接", session.User)
+		return errors2.New("must use STLS before authentication")
 	}
 
-	log.WithContext(session.Ctx).Debugf("POP3 PASS %s , User:%s", pwd, session.User)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=PASS 用户=%s 密码=%s", session.User, pwd)
 
 	// 暴力破解防护：提取客户端 IP，检查速率限制
 	clientIP := pop3ClientIP(session)
 	if lockErr := ratelimit.Check(clientIP, session.User); lockErr != nil {
-		log.WithField("ip", clientIP).Warnf("POP3 auth rate limited: %v", lockErr)
+		pmailLog.Pop3Warnf(ctx, pmailLog.EventPOP3RateLimit, "IP=%s 用户=%s 原因=%v", clientIP, session.User, lockErr)
 		return errors2.New("too many failed attempts, try again later")
 	}
 
@@ -129,7 +125,7 @@ func (a action) Pass(session *gopop.Session, pwd string) error {
 	// 仅用账号查询，不将密码作为查询条件（支持双算法验证）
 	_, err := db.Instance.Where("account =? and disabled = 0", session.User).Get(&user)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		log.WithContext(session.Ctx.(*context.Context)).Errorf("%+v", err)
+		pmailLog.Pop3Errorf(ctx, pmailLog.EventPOP3Cmd, "命令=PASS 数据库查询失败 用户=%s 错误=%v", session.User, err)
 	}
 
 	if user.ID > 0 {
@@ -146,40 +142,43 @@ func (a action) Pass(session *gopop.Session, pwd string) error {
 			}
 
 			session.Status = gopop.TRANSACTION
+			ctx.UserID = user.ID
+			ctx.UserName = user.Name
+			ctx.UserAccount = user.Account
 
-			session.Ctx.(*context.Context).UserID = user.ID
-			session.Ctx.(*context.Context).UserName = user.Name
-			session.Ctx.(*context.Context).UserAccount = user.Account
-
+			pmailLog.Pop3Infof(ctx, pmailLog.EventPOP3AuthSuccess, "用户=%s IP=%s", user.Account, clientIP)
 			return nil
 		}
 	}
 
 	// 认证失败，记录失败
 	ratelimit.RecordFailure(clientIP, session.User)
+	pmailLog.Pop3Warnf(ctx, pmailLog.EventPOP3AuthFail, "用户=%s IP=%s", session.User, clientIP)
 	return errors2.New("password error")
 }
 
-// Apop APOP登陆命令，包含暴力破解防护
+// Apop 处理 POP3 APOP 登录命令，包含暴力破解防护。
+// 安全策略：拒绝非TLS连接上的认证，防止凭据明文传输（与SMTP AllowInsecureAuth=false对齐）。
 func (a action) Apop(session *gopop.Session, username, digest string) error {
-	if session.Ctx == nil {
-		tc := &context.Context{}
-		tc.SetValue(context.LogID, id.GenLogID())
-		session.Ctx = tc
-	}
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: APOP, Args:%s,%s", username, digest)
+	ctx := ensureCtx(session)
 
 	infos := strings.Split(username, "@")
 	if len(infos) > 1 {
 		username = infos[0]
 	}
 
-	log.WithContext(session.Ctx).Debugf("POP3 APOP %s %s", username, digest)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=APOP 用户=%s 摘要=%s", username, digest)
+
+	// 强制TLS认证：非加密连接上拒绝提交凭据，客户端必须先执行STLS升级为TLS
+	if !session.InTls {
+		pmailLog.Pop3Warnf(ctx, pmailLog.EventPOP3AuthRejected, "用户=%s 原因=明文连接", username)
+		return errors2.New("must use STLS before authentication")
+	}
 
 	// 暴力破解防护：检查速率限制
 	clientIP := pop3ClientIP(session)
 	if lockErr := ratelimit.Check(clientIP, username); lockErr != nil {
-		log.WithField("ip", clientIP).Warnf("POP3 APOP rate limited: %v", lockErr)
+		pmailLog.Pop3Warnf(ctx, pmailLog.EventPOP3RateLimit, "IP=%s 用户=%s 原因=%v", clientIP, username, lockErr)
 		return errors2.New("too many failed attempts, try again later")
 	}
 
@@ -190,7 +189,7 @@ func (a action) Apop(session *gopop.Session, username, digest string) error {
 
 	_, err := db.Instance.Where("account =? and disabled = 0", username).Get(&user)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		log.WithContext(session.Ctx.(*context.Context)).Errorf("%+v", err)
+		pmailLog.Pop3Errorf(ctx, pmailLog.EventPOP3Cmd, "命令=APOP 数据库查询失败 用户=%s 错误=%v", username, err)
 	}
 
 	if user.ID > 0 && digest == password.Md5Encode(user.Password) {
@@ -199,36 +198,36 @@ func (a action) Apop(session *gopop.Session, username, digest string) error {
 
 		session.User = username
 		session.Status = gopop.TRANSACTION
+		ctx.UserID = user.ID
+		ctx.UserName = user.Name
+		ctx.UserAccount = user.Account
 
-		session.Ctx.(*context.Context).UserID = user.ID
-		session.Ctx.(*context.Context).UserName = user.Name
-		session.Ctx.(*context.Context).UserAccount = user.Account
-
+		pmailLog.Pop3Infof(ctx, pmailLog.EventPOP3AuthSuccess, "用户=%s IP=%s 方法=APOP", user.Account, clientIP)
 		return nil
 	}
 
 	// 认证失败，记录失败
 	ratelimit.RecordFailure(clientIP, username)
+	pmailLog.Pop3Warnf(ctx, pmailLog.EventPOP3AuthFail, "用户=%s IP=%s 方法=APOP", username, clientIP)
 	return errors2.New("password error")
-
 }
 
-// Stat 查询邮件数量
+// Stat 处理 POP3 STAT 命令，查询邮件数量和总大小。
 func (a action) Stat(session *gopop.Session) (msgNum, msgSize int64, err error) {
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: STAT")
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=STAT")
 
-	num, size := list.Stat(session.Ctx.(*context.Context))
-	log.WithContext(session.Ctx).Debugf("POP3 STAT RETURT : %d,%d", num, size)
+	num, size := list.Stat(ctx)
 	return num, size, nil
 }
 
-// Uidl 查询某封邮件的唯一标志符
+// Uidl 处理 POP3 UIDL 命令，查询邮件唯一标识符。
 func (a action) Uidl(session *gopop.Session, msg string) ([]gopop.UidlItem, error) {
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: UIDL ,Args:%s", msg)
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=UIDL 消息=%s", msg)
 
 	reqId := cast.ToInt64(msg)
 	if reqId > 0 {
-		log.WithContext(session.Ctx).Debugf("Uidl \n %+v", reqId)
 		return []gopop.UidlItem{
 			{
 				Id:      reqId,
@@ -239,7 +238,7 @@ func (a action) Uidl(session *gopop.Session, msg string) ([]gopop.UidlItem, erro
 
 	var res []listItem
 
-	emailList, _ := list.GetEmailList(session.Ctx.(*context.Context), dto.SearchTag{Type: consts.EmailTypeReceive, Status: -1, GroupId: -1}, "", true, 0, 99999)
+	emailList, _ := list.GetEmailList(ctx, dto.SearchTag{Type: consts.EmailTypeReceive, Status: -1, GroupId: -1}, "", true, 0, 99999)
 	for _, info := range emailList {
 		res = append(res, listItem{
 			Id:   cast.ToInt64(info.Id),
@@ -254,7 +253,6 @@ func (a action) Uidl(session *gopop.Session, msg string) ([]gopop.UidlItem, erro
 		})
 	}
 
-	log.WithContext(session.Ctx).Debugf("Uidl \n %+v", ret)
 	return ret, nil
 }
 
@@ -263,9 +261,11 @@ type listItem struct {
 	Size int64 `json:"size"`
 }
 
-// List 邮件列表
+// List 处理 POP3 LIST 命令，返回邮件列表。
 func (a action) List(session *gopop.Session, msg string) ([]gopop.MailInfo, error) {
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: LIST ,Args:%s", msg)
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=LIST 消息=%s", msg)
+
 	var res []listItem
 	var listId int
 	if msg != "" {
@@ -276,7 +276,7 @@ func (a action) List(session *gopop.Session, msg string) ([]gopop.MailInfo, erro
 	}
 
 	if listId != 0 {
-		info, err := detail.GetEmailDetail(session.Ctx.(*context.Context), listId, false)
+		info, err := detail.GetEmailDetail(ctx, listId, false)
 		if err != nil {
 			return nil, err
 		}
@@ -289,7 +289,7 @@ func (a action) List(session *gopop.Session, msg string) ([]gopop.MailInfo, erro
 		}
 		res = append(res, item)
 	} else {
-		emailList, _ := list.GetEmailList(session.Ctx.(*context.Context), dto.SearchTag{Type: consts.EmailTypeReceive, Status: -1, GroupId: -1}, "", true, 0, 99999)
+		emailList, _ := list.GetEmailList(ctx, dto.SearchTag{Type: consts.EmailTypeReceive, Status: -1, GroupId: -1}, "", true, 0, 99999)
 		for _, info := range emailList {
 			item := listItem{
 				Id:   cast.ToInt64(info.Id),
@@ -309,49 +309,54 @@ func (a action) List(session *gopop.Session, msg string) ([]gopop.MailInfo, erro
 		})
 	}
 
-	log.WithContext(session.Ctx).Debugf("List \n %+v", ret)
 	return ret, nil
 }
 
-// Retr 获取邮件详情
+// Retr 处理 POP3 RETR 命令，获取邮件完整内容。
 func (a action) Retr(session *gopop.Session, id int64) (string, int64, error) {
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: RETR ,Args:%d", id)
-	email, err := detail.GetEmailDetail(session.Ctx.(*context.Context), cast.ToInt(id), false)
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=RETR 消息ID=%d", id)
+
+	email, err := detail.GetEmailDetail(ctx, cast.ToInt(id), false)
 	if err != nil {
-		log.WithContext(session.Ctx.(*context.Context)).Errorf("%+v", err)
+		pmailLog.Pop3Errorf(ctx, pmailLog.EventPOP3Cmd, "命令=RETR 消息ID=%d 错误=%v", id, err)
 		return "", 0, errors.New("server error")
 	}
 
-	ret := parsemail.NewEmailFromModel(email.Email).BuildBytes(session.Ctx.(*context.Context), false)
-	log.WithContext(session.Ctx).Debugf("Retr \n %+v", string(ret))
+	ret := parsemail.NewEmailFromModel(email.Email).BuildBytes(ctx, false)
 	return string(ret), cast.ToInt64(len(ret)), nil
-
 }
 
-// Delete 删除邮件
+// Delete 处理 POP3 DELE 命令，标记邮件为删除。
 func (a action) Delete(session *gopop.Session, id int64) error {
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: DELE ,Args:%d", id)
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=DELE 消息ID=%d", id)
 
 	session.DeleteIds = append(session.DeleteIds, id)
 	session.DeleteIds = array.Unique(session.DeleteIds)
 	return nil
 }
 
+// Rest 处理 POP3 RSET 命令，重置删除标记。
 func (a action) Rest(session *gopop.Session) error {
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: REST ")
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=RSET")
 	session.DeleteIds = []int64{}
 	return nil
 }
 
+// Top 处理 POP3 TOP 命令，获取邮件头部和指定行数的内容。
 func (a action) Top(session *gopop.Session, id int64, n int) (string, error) {
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: TOP %d %d", id, n)
-	email, err := detail.GetEmailDetail(session.Ctx.(*context.Context), cast.ToInt(id), false)
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=TOP 消息ID=%d 行数=%d", id, n)
+
+	email, err := detail.GetEmailDetail(ctx, cast.ToInt(id), false)
 	if err != nil {
-		log.WithContext(session.Ctx.(*context.Context)).Errorf("%+v", err)
-		return "", errors2.New("password error")
+		pmailLog.Pop3Errorf(ctx, pmailLog.EventPOP3Cmd, "命令=TOP 消息ID=%d 错误=%v", id, err)
+		return "", errors2.New("server error")
 	}
 
-	ret := parsemail.NewEmailFromModel(email.Email).BuildBytes(session.Ctx.(*context.Context), false)
+	ret := parsemail.NewEmailFromModel(email.Email).BuildBytes(ctx, false)
 	res := strings.Split(string(ret), "\n")
 	headerEndLine := len(res) - 1
 	for i, re := range res {
@@ -365,18 +370,20 @@ func (a action) Top(session *gopop.Session, id int64, n int) (string, error) {
 	}
 
 	lines := array.Join(res[0:headerEndLine+n+1], "\n")
-	log.WithContext(session.Ctx).Debugf("Top \n %+v", lines)
 	return lines, nil
-
 }
 
+// Noop 处理 POP3 NOOP 命令，保持连接活跃。
 func (a action) Noop(session *gopop.Session) error {
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: NOOP ")
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=NOOP")
 	return nil
 }
 
+// Quit 处理 POP3 QUIT 命令，执行标记删除并关闭会话。
 func (a action) Quit(session *gopop.Session) error {
-	log.WithContext(session.Ctx).Debugf("POP3 CMD: QUIT ")
+	ctx := ensureCtx(session)
+	pmailLog.Pop3Debugf(ctx, pmailLog.EventPOP3Cmd, "命令=QUIT")
 
 	var DelIds []int
 
@@ -385,7 +392,7 @@ func (a action) Quit(session *gopop.Session) error {
 			DelIds = append(DelIds, cast.ToInt(delId))
 		}
 
-		del_email.DelEmail(session.Ctx.(*context.Context), DelIds, false)
+		del_email.DelEmail(ctx, DelIds, false)
 	}
 
 	return nil

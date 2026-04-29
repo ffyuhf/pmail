@@ -21,10 +21,10 @@ import (
 	"github.com/ffyuhf/pmail/services/rule"
 	"github.com/ffyuhf/pmail/utils/array"
 	"github.com/ffyuhf/pmail/utils/async"
-	"github.com/ffyuhf/pmail/utils/context"
+	pmailContext "github.com/ffyuhf/pmail/utils/context"
+	pmailLog "github.com/ffyuhf/pmail/utils/log"
 	"github.com/ffyuhf/pmail/utils/send"
 	"github.com/mileusna/spf"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
 	. "xorm.io/builder"
 )
@@ -35,28 +35,29 @@ import (
 // 注意：此开关只能通过修改代码来更改，不暴露给用户配置
 const DropUnknownRecipientEmails = true
 
+// Data 处理 SMTP DATA 命令，接收并处理完整邮件内容。
+// 根据是否已认证区分转发（已登录用户发送）和收件（外部邮件接收）两种流程。
 func (s *Session) Data(r io.Reader) error {
 
 	ctx := s.Ctx
 
-	log.WithContext(ctx).Debugf("收到邮件")
-
 	emailData, err := io.ReadAll(r)
 	if err != nil {
-		log.WithContext(ctx).Error("邮件内容无法读取", err)
+		pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailRecv, "读取失败 错误=%v", err)
 		return err
 	}
 
-	log.WithContext(ctx).Debugf("%s", string(emailData))
+	pmailLog.SmtpDebugf(ctx, pmailLog.EventSMTPMailRecv, "原始数据大小=%d", len(emailData))
 
-	log.WithContext(ctx).Debugf("开始执行插件ReceiveParseBefore！")
+	// 执行 ReceiveParseBefore 插件链
+	pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=接收解析前 开始")
 	for _, hook := range hooks.HookList {
 		if hook == nil {
 			continue
 		}
 		hook.ReceiveParseBefore(ctx, &emailData)
 	}
-	log.WithContext(ctx).Debugf("开始执行插件ReceiveParseBefore End！")
+	pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=接收解析前 结束")
 
 	email := parsemail.NewEmailFromReader(s.To, bytes.NewReader(emailData), len(emailData))
 
@@ -67,8 +68,6 @@ func (s *Session) Data(r io.Reader) error {
 		}
 		if email.From.EmailAddress != from.EmailAddress {
 			// 协议中的from和邮件内容中的from不匹配，当成垃圾邮件处理
-			//log.WithContext(s.Ctx).Infof("垃圾邮件，拒信")
-			//return nil
 		}
 	}
 
@@ -79,30 +78,29 @@ func (s *Session) Data(r io.Reader) error {
 			return oerrors.New("No Auth")
 		}
 
-		log.WithContext(ctx).Debugf("开始执行插件SendBefore！")
+		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=发送前 开始")
 		for _, hook := range hooks.HookList {
 			if hook == nil {
 				continue
 			}
 			hook.SendBefore(ctx, email)
 		}
-		log.WithContext(ctx).Debugf("开始执行插件SendBefore！End")
+		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=发送前 结束")
 
 		if email == nil {
 			return nil
 		}
 
-		// 转发
+		// 转发流程：保存邮件记录
 		_, _, err := saveEmail(ctx, len(emailData), email, s.Ctx.UserID, 1, nil, true, true)
 		if err != nil {
-			log.WithContext(ctx).Errorf("Email Save Error %v", err)
+			pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailSend, "保存失败 错误=%v", err)
 		}
 
 		errMsg := ""
 		err, sendErr := send.Send(ctx, email)
 
-		log.WithContext(ctx).Debugf("插件执行--SendAfter")
-
+		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=发送后 开始")
 		as3 := async.New(ctx)
 		for _, hook := range hooks.HookList {
 			if hook == nil {
@@ -113,60 +111,67 @@ func (s *Session) Data(r io.Reader) error {
 			}, hook)
 		}
 		as3.Wait()
-		log.WithContext(ctx).Debugf("插件执行--SendAfter")
+		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=发送后 结束")
 
 		if err != nil {
 			errMsg = err.Error()
+			pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailDeliver, "消息ID=%d 状态=失败 错误=%s", email.MessageId, errMsg)
 			_, err := db.Instance.Exec(db.WithContext(ctx, "update email set status =2 ,error=? where id = ? "), errMsg, email.MessageId)
 			if err != nil {
-				log.WithContext(ctx).Errorf("sql Error :%+v", err)
+				pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailDeliver, "数据库更新失败 错误=%v", err)
 			}
 			_, err = db.Instance.Exec(db.WithContext(ctx, "update user_email set status =2  where email_id = ? "), email.MessageId)
 			if err != nil {
-				log.WithContext(ctx).Errorf("sql Error :%+v", err)
+				pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailDeliver, "数据库更新失败 错误=%v", err)
 			}
 
 		} else {
+			pmailLog.SmtpInfof(ctx, pmailLog.EventSMTPMailDeliver, "消息ID=%d 状态=成功", email.MessageId)
 			_, err := db.Instance.Exec(db.WithContext(ctx, "update email set status =1  where id = ? "), email.MessageId)
 			if err != nil {
-				log.WithContext(ctx).Errorf("sql Error :%+v", err)
+				pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailDeliver, "数据库更新失败 错误=%v", err)
 			}
 			_, err = db.Instance.Exec(db.WithContext(ctx, "update user_email set status =1  where email_id = ? "), email.MessageId)
 			if err != nil {
-				log.WithContext(ctx).Errorf("sql Error :%+v", err)
+				pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailDeliver, "数据库更新失败 错误=%v", err)
 			}
 		}
 
 	} else {
-		// 收件
+		// 收件流程：接收外部邮件
 
 		var dkimStatus, SPFStatus bool
 
-		// DKIM校验
+		// DKIM 校验
 		dkimStatus = parsemail.Check(ctx, bytes.NewReader(emailData))
+		pmailLog.SmtpInfof(ctx, pmailLog.EventSMTPDKIM, "结果=%v 发件人=%s", dkimStatus, email.From.EmailAddress)
 
+		// SPF 校验
 		SPFStatus = spfCheck(s.RemoteAddress.String(), email.Sender, email.Sender.EmailAddress)
+		pmailLog.SmtpInfof(ctx, pmailLog.EventSMTPSPF, "结果=%v IP=%s 发送者=%s", SPFStatus, s.RemoteAddress.String(), email.Sender.EmailAddress)
 
-		log.WithContext(ctx).Debugf("开始执行插件ReceiveParseAfter！")
+		// 执行 ReceiveParseAfter 插件链
+		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=接收解析后 开始")
 		for _, hook := range hooks.HookList {
 			if hook == nil {
 				continue
 			}
 			hook.ReceiveParseAfter(ctx, email)
 		}
-		log.WithContext(ctx).Debugf("开始执行插件ReceiveParseAfter！End")
+		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=接收解析后 结束")
 
 		_, formDomain := email.From.GetDomainAccount()
-		// 伪造邮件
+		// 伪造邮件检测：本地域名但 SPF 不通过
 		if array.InArray(formDomain, config.Instance.Domains) && SPFStatus == false {
 			dkimStatus = false
 			email.Status = 3
+			pmailLog.SmtpWarnf(ctx, pmailLog.EventSMTPMailReject, "原因=伪造发件人 发件人=%s 域名=%s SPF=false", email.From.EmailAddress, formDomain)
 		}
 
 		users, dbEmail, _ := saveEmail(ctx, len(emailData), email, 0, 0, s.To, SPFStatus, dkimStatus)
 
 		if email.MessageId > 0 {
-			log.WithContext(ctx).Debugf("开始执行邮件规则！")
+			pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=规则匹配 开始")
 			for _, user := range users {
 				// 执行邮件规则
 				rs := rule.GetAllRules(ctx, user.ID)
@@ -176,13 +181,15 @@ func (s *Session) Data(r io.Reader) error {
 					}
 				}
 			}
+			pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=规则匹配 结束")
 		}
 
-		log.WithContext(ctx).Debugf("开始执行插件ReceiveSaveAfter！")
+		// 执行 ReceiveSaveAfter 插件链
+		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=接收保存后 开始")
 		var ue []*models.UserEmail
 		err = db.Instance.Table(&models.UserEmail{}).Where("email_id=?", email.MessageId).Find(&ue)
 		if err != nil {
-			log.WithContext(ctx).Errorf("sql Error :%+v", err)
+			pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailRecv, "查询用户邮件关联失败 错误=%v", err)
 		}
 		as3 := async.New(ctx)
 		for _, hook := range hooks.HookList {
@@ -194,9 +201,9 @@ func (s *Session) Data(r io.Reader) error {
 			}, hook)
 		}
 		as3.Wait()
-		log.WithContext(ctx).Debugf("开始执行插件ReceiveSaveAfter！End")
+		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=接收保存后 结束")
 
-		// IDLE命令通知
+		// IDLE 命令通知已连接的 IMAP 客户端
 		for _, user := range users {
 			imap_server.IdleNotice(ctx, user.ID, dbEmail)
 		}
@@ -206,7 +213,9 @@ func (s *Session) Data(r io.Reader) error {
 	return nil
 }
 
-func saveEmail(ctx *context.Context, size int, email *parsemail.Email, sendUserID int, emailType int, reallyTo []string, SPFStatus, dkimStatus bool) ([]*models.User, *models.Email, error) {
+// saveEmail 将邮件保存到数据库，并根据收件人匹配用户。
+// 对于收件流程（emailType=0），查找匹配的本地用户；找不到时根据垃圾邮件过滤策略决定丢弃或转交管理员。
+func saveEmail(ctx *pmailContext.Context, size int, email *parsemail.Email, sendUserID int, emailType int, reallyTo []string, SPFStatus, dkimStatus bool) ([]*models.User, *models.Email, error) {
 	var dkimV, spfV int8
 	if dkimStatus {
 		dkimV = 1
@@ -214,8 +223,6 @@ func saveEmail(ctx *context.Context, size int, email *parsemail.Email, sendUserI
 	if SPFStatus {
 		spfV = 1
 	}
-
-	log.WithContext(ctx).Debugf("开始入库！")
 
 	if email == nil {
 		return nil, nil, nil
@@ -253,13 +260,14 @@ func saveEmail(ctx *context.Context, size int, email *parsemail.Email, sendUserI
 	_, err := db.Instance.Insert(&modelEmail)
 
 	if err != nil {
-		log.WithContext(ctx).Errorf("db insert error:%+v", err.Error())
+		pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailRecv, "数据库插入邮件失败 错误=%v", err)
 	}
 
 	if modelEmail.Id > 0 {
 		email.MessageId = cast.ToInt64(modelEmail.Id)
 		email.MsgID = modelEmail.MsgID
 	}
+
 	// 收信人信息
 	var users []*models.User
 
@@ -295,20 +303,21 @@ func saveEmail(ctx *context.Context, size int, email *parsemail.Email, sendUserI
 
 		err = db.Instance.Table(&models.User{}).Where(where, params...).Find(&users)
 		if err != nil {
-			log.WithContext(ctx).Errorf("db Select error:%+v", err.Error())
+			pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailRecv, "查询收件人失败 错误=%v", err)
 		}
 
 		if len(users) > 0 {
+			pmailLog.SmtpInfof(ctx, pmailLog.EventSMTPMailRecv, "发件人=%s 收件人=%v 大小=%d 匹配用户数=%d", email.From.EmailAddress, accounts, size, len(users))
 			for _, user := range users {
 				ue := models.UserEmail{EmailID: modelEmail.Id, UserID: user.ID, Status: cast.ToInt8(email.Status)}
 				_, err = db.Instance.Insert(&ue)
 				if err != nil {
-					log.WithContext(ctx).Errorf("db insert error:%+v", err.Error())
+					pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailRecv, "插入用户邮件关联失败 错误=%v", err)
 				}
 			}
 		} else {
 			// 找不到收件人
-			// 如果启用了保护功能，且 验证失败，则丢弃邮件
+			// 如果启用了保护功能，且验证失败，则丢弃邮件
 			// 验证通过的邮件即使收件人不存在也应交给管理员，避免误丢弃合法邮件
 
 			// 垃圾过滤
@@ -316,25 +325,24 @@ func saveEmail(ctx *context.Context, size int, email *parsemail.Email, sendUserI
 				((config.Instance.SpamFilterLevel == 1 && !SPFStatus && !dkimStatus) ||
 					(config.Instance.SpamFilterLevel == 2 && !SPFStatus) ||
 					(config.Instance.SpamFilterLevel == 3 && !dkimStatus)) {
-				log.WithContext(ctx).Infoln("垃圾邮件，拒信")
-				// 直接删除已插入的邮件记录，不关联任何用户
-				log.WithContext(ctx).Infof("收件人不存在且DKIM验证失败，丢弃邮件: %s -> %v", email.From.EmailAddress, accounts)
+				// 垃圾邮件：收件人不存在且验证失败，直接丢弃
+				pmailLog.SmtpWarnf(ctx, pmailLog.EventSMTPMailReject, "发件人=%s 收件人=%v 原因=收件人不存在且验证失败 SPF=%v DKIM=%v 过滤级别=%d", email.From.EmailAddress, accounts, SPFStatus, dkimStatus, config.Instance.SpamFilterLevel)
 				_, delErr := db.Instance.Delete(&models.Email{Id: modelEmail.Id})
 				if delErr != nil {
-					log.WithContext(ctx).Errorf("db delete error:%+v", delErr.Error())
+					pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailReject, "数据库删除失败 错误=%v", delErr)
 				}
 				return nil, nil, nil
 			}
 
 			// DKIM 验证通过或未启用保护功能时，邮件丢给管理员账号
-			log.WithContext(ctx).Infof("收件人不存在但DKIM验证通过，转交管理员: %s -> %v", email.From.EmailAddress, accounts)
+			pmailLog.SmtpInfof(ctx, pmailLog.EventSMTPMailForwardAdmin, "发件人=%s 收件人=%v 原因=收件人不存在 SPF=%v DKIM=%v", email.From.EmailAddress, accounts, SPFStatus, dkimStatus)
 
 			err = db.Instance.Table(&models.User{}).Where("is_admin=1").Find(&users)
 			for _, user := range users {
 				ue := models.UserEmail{EmailID: modelEmail.Id, UserID: user.ID, Status: cast.ToInt8(email.Status)}
 				_, err = db.Instance.Insert(&ue)
 				if err != nil {
-					log.WithContext(ctx).Errorf("db insert error:%+v", err.Error())
+					pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailForwardAdmin, "数据库插入失败 错误=%v", err)
 				}
 			}
 		}
@@ -342,7 +350,7 @@ func saveEmail(ctx *context.Context, size int, email *parsemail.Email, sendUserI
 		ue := models.UserEmail{EmailID: modelEmail.Id, UserID: ctx.UserID}
 		_, err = db.Instance.Insert(&ue)
 		if err != nil {
-			log.WithContext(ctx).Errorf("db insert error:%+v", err.Error())
+			pmailLog.SmtpErrorf(ctx, pmailLog.EventSMTPMailSend, "插入用户邮件关联失败 错误=%v", err)
 		}
 	}
 
@@ -354,8 +362,9 @@ func json2string(d any) string {
 	return string(by)
 }
 
+// spfCheck 对发件人 IP 地址执行 SPF 记录校验。
+// 内网 IP 默认通过；外网 IP 查询域名 SPF 记录判断是否授权。
 func spfCheck(remoteAddress string, sender *parsemail.User, senderString string) bool {
-	//spf校验
 	ipAddress, _ := netip.ParseAddrPort(remoteAddress)
 
 	ip := net.ParseIP(ipAddress.Addr().String())
@@ -371,7 +380,6 @@ func spfCheck(remoteAddress string, sender *parsemail.User, senderString string)
 	res := spf.CheckHost(ip, tmp[1], senderString, "")
 
 	if res == spf.None || res == spf.Pass {
-		// spf校验通过
 		return true
 	}
 	return false

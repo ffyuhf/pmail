@@ -52,7 +52,7 @@ func HttpsStart() {
 	}
 
 	if config.Instance.HttpsEnabled != 2 {
-		log.Infof("Https Server Start On Port :%d", HttpsPort)
+		log.Infof("[HTTPS] HTTPS服务启动 端口=%d", HttpsPort)
 		httpsServer = &http.Server{
 			Addr:         fmt.Sprintf(":%d", HttpsPort),
 			Handler:      session.Instance.LoadAndSave(mux),
@@ -64,10 +64,10 @@ func HttpsStart() {
 		if err != nil {
 			if errors.Is(err, http.ErrServerClosed) {
 				// 正常关闭（重启或停机）
-				log.Infof("Https Server closed normally on port :%d", HttpsPort)
+				log.Infof("[HTTPS] HTTPS服务正常关闭 端口=%d", HttpsPort)
 			} else {
 				// 异常错误仍然打印并退出
-				log.Errorf("Https Server error on port :%d, %+v", HttpsPort, err)
+				log.Errorf("[HTTPS] HTTPS服务异常 端口=%d 错误=%+v", HttpsPort, err)
 				panic(err)
 			}
 		}
