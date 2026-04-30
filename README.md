@@ -84,7 +84,7 @@ jinnrry作者更的太慢了，功能对我来说太少了
 ## 1、下载文件
 
 * [点击这里](https://github.com/ffyuhf/pmail/releases)下载一个与你匹配的程序文件（支持 Linux amd64/arm64、Windows、macOS 等多平台）。
-* 或者使用Docker运行 `docker pull ghcr.io/jinnrry/pmail:latest`
+* 或者使用Docker运行 `docker pull ghcr.io/ffyuhf/pmail:latest`
 
 ## 2、运行
 
@@ -97,7 +97,7 @@ jinnrry作者更的太慢了，功能对我来说太少了
 
 或者
 
-`docker run -p 25:25 -p 80:80 -p 443:443 -p 110:110 -p 465:465 -p 587:587 -p 995:995 -p 993:993 -v $(pwd)/config:/work/config ghcr.io/jinnrry/pmail:latest`
+`docker run -p 25:25 -p 80:80 -p 443:443 -p 110:110 -p 465:465 -p 587:587 -p 995:995 -p 993:993 -v $(pwd)/config:/work/config ghcr.io/ffyuhf/pmail:latest`
 
 > [!IMPORTANT]
 > 如果你服务器开启了防火墙，你需要打开25、80、110、443、465、587、995、993端口
