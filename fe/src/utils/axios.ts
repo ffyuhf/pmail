@@ -38,7 +38,10 @@ http.interceptors.response.use(async (response): Promise<any> => {
         });
     }
     //响应成功
-    if (response.data.errorNo === 402) {
+    // 修改日期: 20260504，增加当前路由判断：
+    // 当已在 /setup 页面时跳过重定向，防止 redirect 参数无限嵌套导致死循环。
+    // 场景：Setup 页面的 API 调用返回 402 时，不应再次重定向到 /setup。
+    if (response.data.errorNo === 402 && router.currentRoute.value.path !== '/setup') {
         await router.replace({
             path: '/setup',
             query: {

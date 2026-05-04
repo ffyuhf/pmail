@@ -235,8 +235,26 @@ import {useRoute} from 'vue-router'
 // 从 URL 读取 Setup Token，用于接口鉴权。
 // 服务端启动时生成随机 Token，通过 URL query param 传递给前端。
 // 修改日期: 20260425
+// 修改日期: 20260504，增加 fallback：从 window.location.search 解析 token。
+// 原因：前端使用 Vue Router hash 模式，route.query 仅读取 # 之后的参数。
+// 若用户访问旧格式 URL（http://host/?token=xxx），token 在 # 之前，
+// route.query.token 为空，需从 window.location.search 兜底读取。
 const route = useRoute()
-const setupToken = ref<string>((route.query.token as string) || '')
+
+/**
+ * 从 window.location.search 中解析指定 query 参数。
+ * 用于读取 hash 路由模式下 # 之前的 query 参数。
+ * @param name - 参数名
+ * @returns 参数值或空字符串
+ */
+function getQueryParamFromSearch(name: string): string {
+  const searchParams = new URLSearchParams(window.location.search)
+  return searchParams.get(name) || ''
+}
+
+const setupToken = ref<string>(
+  (route.query.token as string) || getQueryParamFromSearch('token') || ''
+)
 
 const waitDesc = ref(lang.wait_desc);
 
