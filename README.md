@@ -107,7 +107,7 @@ jinnrry作者更的太慢了，功能对我来说太少了
 为安全考虑，程序启动后会在日志中打印 Setup URL（含 Token 参数），例如：
 
 ```
-Please click http://YOUR_IP/?token=xxxxxxxx to continue.
+Please click http://YOUR_IP/#/setup?token=xxxxxxxx to continue.
 ```
 
 - **直接运行**：查看终端输出的启动日志，点击或复制其中的 URL 到浏览器打开
@@ -225,7 +225,8 @@ IMAP端口： 993(SSL)
 
 ### 3. Setup 访问方式变更
 
-- Setup 页面必须通过启动日志中带 `?token=xxx` 参数的 URL 访问
+- Setup 页面必须通过启动日志中带 `#/setup?token=xxx` 参数的 URL 访问（新格式，兼容 Vue Router hash 模式）
+- 旧格式 `?token=xxx` 仍然兼容，前端会自动从 `window.location.search` 读取
 - Setup 接口仅接受 POST 请求
 
 ## 升级注意事项
@@ -236,7 +237,7 @@ IMAP端口： 993(SSL)
 |------|------|
 | **更新 DNS DKIM 记录** | DKIM 密钥已从 1024 位升级为 2048 位，首次启动自动重新生成，需将新公钥更新到 DNS TXT 记录 |
 | **重新生成 API Token** | 旧格式 Token 已失效，需通过 `/api/token/generate` 重新生成 |
-| **记录 Setup Token** | 首次部署时 Setup URL 携带一次性 Token，从启动日志获取 |
+| **记录 Setup Token** | 首次部署时 Setup URL 携带一次性 Token，从启动日志获取（格式为 `http://IP/#/setup?token=xxx`） |
 
 ### 自动处理（无需手动操作）
 
