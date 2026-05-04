@@ -155,7 +155,9 @@
         <h2>{{ lang.setSSL }}</h2>
         <div style="margin-top: 10px;">{{ lang.setSSL }}</div>
       </div>
-      <div class="setup__form" width="600px">
+      <!-- 修复: width HTML 属性无效，改为 style -->
+      <!-- 修改日期: 20260504 -->
+      <div class="setup__form" style="width: 600px;">
         <el-form label-width="120px">
           <el-form-item :label="lang.type">
             <el-select :placeholder="lang.ssl_auto" v-model="sslSettings.type" :disabled="dnsChecking">
@@ -164,17 +166,21 @@
             </el-select>
           </el-form-item>
 
+          <!-- 验证方式与帮助图标用 flex 容器包裹，防止 el-select 撑满导致 "?" 换行 -->
+          <!-- 修改日期: 20260504，修复自动设置选项显示异常 -->
           <el-form-item :label="lang.ssl_challenge_type" v-if="sslSettings.type === '0'">
-            <el-select :placeholder="lang.ssl_auto_http" v-model="sslSettings.challenge"
-                       :disabled="dnsChecking">
-              <el-option :label="lang.ssl_auto_http" value="http"/>
-              <el-option :label="lang.ssl_auto_dns" value="dns"/>
-            </el-select>
+            <div style="display: flex; align-items: center;">
+              <el-select :placeholder="lang.ssl_auto_http" v-model="sslSettings.challenge"
+                         :disabled="dnsChecking" style="flex: 1;">
+                <el-option :label="lang.ssl_auto_http" value="http"/>
+                <el-option :label="lang.ssl_auto_dns" value="dns"/>
+              </el-select>
 
-            <el-tooltip class="box-item" effect="dark" :content="lang.challenge_typ_desc"
-                        placement="top-start">
-              <span style="margin-left: 6px; font-size:18px; font-weight: bolder;">?</span>
-            </el-tooltip>
+              <el-tooltip class="box-item" effect="dark" :content="lang.challenge_typ_desc"
+                          placement="top-start">
+                <span style="margin-left: 6px; font-size:18px; font-weight: bolder;">?</span>
+              </el-tooltip>
+            </div>
           </el-form-item>
 
 
