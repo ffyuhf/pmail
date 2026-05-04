@@ -104,7 +104,11 @@ func contextIterceptor(h controllers.HandlerFunc) http.HandlerFunc {
 		// CSRF 防护：对写操作校验请求来源，阻止跨站请求伪造
 		// 仅检查 Origin/Referer，同源请求自动通过，跨站请求被拒绝
 		// 修改日期: 20260425
-		if r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
+		// 修改日期: 20260504，增加 config.IsInit 前置判断：
+		// setup 阶段（config.IsInit==false）域名尚未配置，allowedDomains 为空，
+		// isSameOrigin 必然返回 false，导致所有 POST 请求被拦截、setup API 无法执行。
+		// setup 阶段由 SetupToken 鉴权保护，跳过 CSRF 不降低安全性。
+		if config.IsInit && r.Method != "GET" && r.Method != "HEAD" && r.Method != "OPTIONS" {
 			if !isSameOrigin(r) {
 				response.NewErrorResponse(response.ParamsError, "csrf check failed", "").FPrint(w)
 				return
