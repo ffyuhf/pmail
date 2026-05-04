@@ -47,12 +47,15 @@ func SetupStart() {
 		HttpPort = 80
 	}
 
+	// 修改日期: 20260504，URL 格式从 /?token= 改为 /#/setup?token=
+	// 原因：前端使用 Vue Router hash 模式（createWebHashHistory），
+	// route.query 仅能读取 # 之后的参数，token 在 # 之前无法被 SetupView.vue 读取。
 	config.Instance.SetSetupPort(HttpPort)
 	log.Infof("HttpServer Start On Port :%d", HttpPort)
 	if HttpPort == 80 {
-		log.Infof("Please click http://%s/?token=%s to continue.\n", ip.GetIp(), token)
+		log.Infof("Please click http://%s/#/setup?token=%s to continue.\n", ip.GetIp(), token)
 	} else {
-		log.Infof("Please click http://%s:%d/?token=%s to continue.", ip.GetIp(), HttpPort, token)
+		log.Infof("Please click http://%s:%d/#/setup?token=%s to continue.", ip.GetIp(), HttpPort, token)
 	}
 
 	setupServer = &http.Server{
