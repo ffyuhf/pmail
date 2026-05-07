@@ -9,13 +9,17 @@ import (
 )
 
 // bcryptCost bcrypt计算成本因子，越高越安全但越慢
-const bcryptCost = 10
+// 20260507: 从10提升至12，增强密码存储安全性
+const bcryptCost = 12
+
+// bcryptMinCost bcrypt最低安全轮数阈值，低于此值的哈希在验证成功后触发懒迁移
+const bcryptMinCost = 12
 
 // bcryptPrefixes bcrypt哈希的已知前缀标识
 var bcryptPrefixes = []string{"$2a$", "$2b$", "$2y$"}
 
 // Encode 使用bcrypt对密码进行哈希，用于新密码创建和密码重置
-// 输出格式：$2a$10$...（60字符）
+// 输出格式：$2a$12$...（60字符），20260507起cost从10提升至12
 func Encode(password string) string {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
@@ -27,12 +31,17 @@ func Encode(password string) string {
 // Verify 验证明文密码是否匹配存储的哈希值，自动识别bcrypt和旧MD5格式
 // 返回值：
 //   - bool: 密码是否验证成功
-//   - bool: 是否需要将旧MD5哈希升级为bcrypt（仅当旧MD5验证通过时为true）
+//   - bool: 是否需要升级哈希（MD5→bcrypt 或 bcrypt低轮数→高轮数）
 func Verify(password, hash string) (bool, bool) {
 	// 优先尝试bcrypt验证（新格式）
 	if IsBcrypt(hash) {
 		err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-		return err == nil, false // 已是bcrypt，无需升级
+		if err != nil {
+			return false, false // 密码错误
+		}
+		// bcrypt验证通过，检查是否需要升级轮数（如cost=10→12）
+		needsUpgrade := getBcryptCost(hash) < bcryptMinCost
+		return true, needsUpgrade
 	}
 
 	// 回退到旧的MD5验证（向后兼容）
@@ -41,6 +50,19 @@ func Verify(password, hash string) (bool, bool) {
 	}
 
 	return false, false // 验证失败
+}
+
+// getBcryptCost 从bcrypt哈希字符串中提取计算成本因子（轮数）
+// 输入格式示例：$2a$10$N9qo8uLOickgx2ZMRZoMye...
+// 返回值：轮数（如10），非bcrypt格式或解析失败返回-1
+func getBcryptCost(hash string) int {
+	// bcrypt哈希格式：$2a$10$...，轮数位于第4-5个字符（第3个$之前）
+	// 使用标准库的Cost函数解析
+	cost, err := bcrypt.Cost([]byte(hash))
+	if err != nil {
+		return -1
+	}
+	return cost
 }
 
 // IsBcrypt 判断哈希值是否为bcrypt格式

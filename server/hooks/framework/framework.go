@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/ffyuhf/pmail/dto/parsemail"
-	"github.com/ffyuhf/pmail/models"
-	"github.com/ffyuhf/pmail/utils/context"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"net/http"
@@ -15,6 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ffyuhf/pmail/dto/parsemail"
+	"github.com/ffyuhf/pmail/models"
+	"github.com/ffyuhf/pmail/utils/context"
+	log "github.com/sirupsen/logrus"
 )
 
 type EmailHook interface {
@@ -65,7 +66,32 @@ func CreatePlugin(name string, hook EmailHook) *Plugin {
 type logFormatter struct {
 }
 
-// Format 定义日志输出格式
+// shortenFilePath 将绝对文件路径缩短为项目相对路径，提升日志可读性。
+// 截取策略：查找路径中的 "/server/" 段，取其前一级目录名拼接后续路径。
+// 示例：/home/runner/work/pmail/pmail/server/hooks/spam_block/spam_block.go
+//
+//	→ pmail/server/hooks/spam_block/spam_block.go
+//
+// 若路径中不包含 "/server/"，则原样返回，确保不丢失信息。
+func shortenFilePath(fullPath string) string {
+	const marker = "/server/"
+	idx := strings.LastIndex(fullPath, marker)
+	if idx <= 0 {
+		return fullPath
+	}
+	dirEnd := idx
+	dirStart := dirEnd
+	for dirStart > 0 && fullPath[dirStart-1] != '/' {
+		dirStart--
+	}
+	if dirStart >= dirEnd {
+		return fullPath
+	}
+	return fullPath[dirStart:]
+}
+
+// Format 定义日志输出格式：[级别][时间][LogID][文件:行号]消息
+// 文件路径经过 shortenFilePath 缩短处理，提升日志可读性。
 func (l *logFormatter) Format(entry *log.Entry) ([]byte, error) {
 	b := bytes.Buffer{}
 
@@ -77,7 +103,7 @@ func (l *logFormatter) Format(entry *log.Entry) ([]byte, error) {
 			b.WriteString(fmt.Sprintf("[%s]", ctx.GetValue(context.LogID)))
 		}
 	}
-	b.WriteString(fmt.Sprintf("[%s:%d]", entry.Caller.File, entry.Caller.Line))
+	b.WriteString(fmt.Sprintf("[%s:%d]", shortenFilePath(entry.Caller.File), entry.Caller.Line))
 	b.WriteString(entry.Message)
 
 	b.WriteString("\n")

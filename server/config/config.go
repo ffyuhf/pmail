@@ -163,8 +163,36 @@ func (l *logFormatter) Format(entry *log.Entry) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// shortenFilePath 将绝对文件路径缩短为项目相对路径，提升日志可读性。
+// 截取策略：查找路径中的 "/server/" 段，取其前一级目录名拼接后续路径。
+// 示例：/home/runner/work/pmail/pmail/server/listen/smtp_server/action.go
+//
+//	→ pmail/server/listen/smtp_server/action.go
+//
+// 若路径中不包含 "/server/"，则原样返回，确保不丢失信息。
+func shortenFilePath(fullPath string) string {
+	const marker = "/server/"
+	idx := strings.LastIndex(fullPath, marker)
+	if idx <= 0 {
+		// 未找到 "/server/" 标记，回退返回原始路径
+		return fullPath
+	}
+	// 取 "/server/" 前一级目录名：从 idx-1 向前查找上一个 "/"
+	dirEnd := idx // dirEnd 指向 "/server/" 的起始 '/'
+	dirStart := dirEnd
+	for dirStart > 0 && fullPath[dirStart-1] != '/' {
+		dirStart--
+	}
+	if dirStart >= dirEnd {
+		// 无法提取目录名，回退返回原始路径
+		return fullPath
+	}
+	// 拼接：目录名 + "/server/..."（去掉末尾的 "/server/" 前的 "/"）
+	return fullPath[dirStart:]
+}
+
 // getRealCaller 遍历调用栈，跳过 logrus 内部和 utils/log/log.go 包装函数，
-// 返回第一个真实业务代码的 "文件:行号"。未找到时返回 "?"。
+// 返回第一个真实业务代码的 "文件:行号"（路径已缩短）。未找到时返回 "?"。
 func getRealCaller() string {
 	pcs := make([]uintptr, 32)
 	n := runtime.Callers(2, pcs)
@@ -187,8 +215,8 @@ func getRealCaller() string {
 		if strings.Contains(frame.File, "config/config.go") {
 			continue
 		}
-		// 找到真实调用者
-		return fmt.Sprintf("%s:%d", frame.File, frame.Line)
+		// 找到真实调用者，缩短路径后返回
+		return fmt.Sprintf("%s:%d", shortenFilePath(frame.File), frame.Line)
 	}
 	return "?"
 }
