@@ -125,7 +125,7 @@ import lang from '../i18n/i18n';
 import {emailService} from "@/services/emailService";
 import {groupService} from "@/services/groupService";
 import {ElMessage, ElMessageBox} from "element-plus";
-import type {EmailListItem, GroupListItem} from "@/types/api";
+import type {EmailListItem, GroupListItem, GroupItem} from "@/types/api";
 import {formatShortDate} from "@/utils/dateFormat";
 import {normalizeTag, isTrashGroup} from "@/utils/groupTag";
 
@@ -177,10 +177,37 @@ const updateList = function () {
   })
 }
 
-/** 刷新分组列表：通过 groupService 获取数据 */
+/**
+ * 从树形数据中提取含有子文件夹的分组 ID 集合
+ * 修改日期: 20260510 — 用于过滤移动下拉菜单中的父级分组
+ */
+const collectParentIds = (items: GroupItem[]): Set<number> => {
+  const ids = new Set<number>()
+  for (const item of items) {
+    if (item.children && item.children.length > 0) {
+      ids.add(item.id)
+      // 递归收集子层级的父级 ID
+      for (const childId of collectParentIds(item.children)) {
+        ids.add(childId)
+      }
+    }
+  }
+  return ids
+}
+
+/** 刷新分组列表：通过 groupService 获取数据，过滤掉含有子文件夹的父级分组 */
 const updateGroupList = function () {
-  groupService.getGroupList().then((res: any) => {
-    groupList.value = res.data || []
+  // 并行获取平铺列表和树形数据，用于识别并过滤父级分组
+  Promise.all([
+    groupService.getGroupList(),
+    groupService.getGroupTree()
+  ]).then(([listRes, treeRes]: any[]) => {
+    const allGroups: GroupListItem[] = listRes.data || []
+    const tree: GroupItem[] = treeRes.data || []
+    // 收集所有含有子文件夹的分组 ID
+    const parentIds = collectParentIds(tree)
+    // 过滤掉含有子文件夹的分组，仅保留叶子分组
+    groupList.value = allGroups.filter((g: GroupListItem) => !parentIds.has(Number(g.id)))
   })
 }
 

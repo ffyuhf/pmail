@@ -124,6 +124,8 @@ const onInputBlur = function (item: TreeNode) {
       .then((res: any) => {
         if (res.errorNo !== 0) {
           ElMessage({ message: res.errorMsg, type: "error" });
+          // 修改日期: 20260510 — 创建失败时移除无效的临时节点
+          removeTempNode(item)
         } else {
           groupService.getGroupTree().then((res: any) => {
             data.splice(0, data.length);
@@ -131,7 +133,27 @@ const onInputBlur = function (item: TreeNode) {
           });
         }
       });
+  } else {
+    // 空名称时移除临时节点
+    removeTempNode(item)
   }
+};
+
+/** 从父节点的 children 中移除临时节点（id === -1） */
+const removeTempNode = function (item: TreeNode) {
+  const removeFromList = (list: TreeNode[]) => {
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (list[i] === item) {
+        list.splice(i, 1);
+        return true;
+      }
+      if (list[i].children && removeFromList(list[i].children!)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  removeFromList(data);
 };
 </script>
 
