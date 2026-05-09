@@ -2,13 +2,14 @@ package email
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
+
 	"github.com/ffyuhf/pmail/dto/response"
 	"github.com/ffyuhf/pmail/models"
 	"github.com/ffyuhf/pmail/services/group"
 	"github.com/ffyuhf/pmail/utils/context"
 	log "github.com/sirupsen/logrus"
-	"io"
-	"net/http"
 )
 
 type moveRequest struct {
@@ -39,8 +40,9 @@ func Move(ctx *context.Context, w http.ResponseWriter, req *http.Request) {
 			response.NewErrorResponse(response.ServerError, "Error", err.Error()).FPrint(w)
 			return
 		}
-	} else if !group.MoveMailToGroup(ctx, reqData.IDs, reqData.GroupId) {
-		response.NewErrorResponse(response.ServerError, "Error", "").FPrint(w)
+	} else if ok, errMsg := group.MoveMailToGroup(ctx, reqData.IDs, reqData.GroupId); !ok {
+		// 修改日期: 20260510 — 适配 MoveMailToGroup 新返回值，传递错误信息给前端
+		response.NewErrorResponse(response.ServerError, "Error", errMsg).FPrint(w)
 		return
 	}
 	response.NewSuccessResponse("success").FPrint(w)

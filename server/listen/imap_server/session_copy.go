@@ -1,6 +1,7 @@
 package imap_server
 
 import (
+	"github.com/emersion/go-imap/v2"
 	"github.com/ffyuhf/pmail/consts"
 	"github.com/ffyuhf/pmail/db"
 	"github.com/ffyuhf/pmail/dto/response"
@@ -8,7 +9,6 @@ import (
 	"github.com/ffyuhf/pmail/services/group"
 	"github.com/ffyuhf/pmail/services/list"
 	"github.com/ffyuhf/pmail/utils/context"
-	"github.com/emersion/go-imap/v2"
 	"github.com/spf13/cast"
 )
 
@@ -109,6 +109,15 @@ func copy2userbox(ctx *context.Context, mails []*response.EmailResponseData, des
 			Text: "Group not found",
 		}
 	}
+
+	// 修改日期: 20260510 — 检查目标分组是否含有子文件夹，含有子文件夹的分组不允许放置邮件
+	if group.HasChildren(ctx, groupInfo.ID) {
+		return 0, nil, &imap.Error{
+			Type: imap.StatusResponseTypeNo,
+			Text: "Cannot copy mail to a folder that contains subfolders",
+		}
+	}
+
 	var destUid []int
 	for _, email := range mails {
 		newUe := models.UserEmail{

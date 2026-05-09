@@ -1,12 +1,12 @@
 package imap_server
 
 import (
+	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapserver"
 	"github.com/ffyuhf/pmail/dto/response"
 	"github.com/ffyuhf/pmail/services/group"
 	"github.com/ffyuhf/pmail/services/list"
 	"github.com/ffyuhf/pmail/utils/context"
-	"github.com/emersion/go-imap/v2"
-	"github.com/emersion/go-imap/v2/imapserver"
 	"github.com/spf13/cast"
 )
 
@@ -72,7 +72,15 @@ func move2userbox(ctx *context.Context, mailIds []int, dest string) error {
 		}
 	}
 
-	group.MoveMailToGroup(ctx, mailIds, groupInfo.ID)
+	// 修改日期: 20260510 — 检查目标分组是否含有子文件夹，含有子文件夹的分组不允许放置邮件
+	if group.HasChildren(ctx, groupInfo.ID) {
+		return &imap.Error{
+			Type: imap.StatusResponseTypeNo,
+			Text: "Cannot move mail to a folder that contains subfolders",
+		}
+	}
+
+	_, _ = group.MoveMailToGroup(ctx, mailIds, groupInfo.ID)
 
 	return nil
 }
