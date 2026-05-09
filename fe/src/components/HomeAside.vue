@@ -6,6 +6,8 @@
   改造原因: 支持树形折叠菜单，"全部邮件数据"作为可展开/折叠的分组标题
   改造日期: 20260509
   改造原因: 子文件夹列表添加左侧竖线，指示层级关系
+  改造日期: 20260509
+  改造原因: 子列表展开/折叠添加高度过渡动画，箭头图标添加旋转动画
   ============================================================ -->
 <template>
   <div class="sidebar">
@@ -36,25 +38,32 @@
               class="menu__group-title"
               @click="toggleGroup(item.label)"
             >
-              <span class="menu__group-arrow">{{ expandedGroups[item.label] ? '▼' : '▶' }}</span>
+              <span class="menu__group-arrow" :class="{ 'menu__group-arrow--expanded': expandedGroups[item.label] }">▶</span>
               <span>{{ item.label }}</span>
             </a>
-            <!-- 子节点列表 -->
-            <ul v-show="expandedGroups[item.label]" class="menu__sub-list">
-              <li
-                v-for="child in item.children"
-                :key="child.tag"
-                class="menu__list-item"
-              >
-                <a
-                  class="menu__link"
-                  :class="{ 'menu__link--active': activeGroup === child.tag }"
-                  @click="handleMenuSelect(child)"
+            <!-- 子节点列表：使用 Transition 实现展开/折叠高度动画 -->
+            <Transition
+              name="slide"
+              @enter="onSlideEnter"
+              @after-enter="onSlideAfterEnter"
+              @leave="onSlideLeave"
+            >
+              <ul v-if="expandedGroups[item.label]" class="menu__sub-list">
+                <li
+                  v-for="child in item.children"
+                  :key="child.tag"
+                  class="menu__list-item"
                 >
-                  {{ child.label }}
-                </a>
-              </li>
-            </ul>
+                  <a
+                    class="menu__link"
+                    :class="{ 'menu__link--active': activeGroup === child.tag }"
+                    @click="handleMenuSelect(child)"
+                  >
+                    {{ child.label }}
+                  </a>
+                </li>
+              </ul>
+            </Transition>
           </template>
           <!-- 无子节点：渲染为普通菜单项 -->
           <template v-else>
@@ -124,6 +133,36 @@ groupService.getGroupTree().then((res: any) => {
 /** 切换分组的展开/折叠状态 */
 const toggleGroup = function (label: string) {
   expandedGroups[label] = !expandedGroups[label];
+};
+
+/** Transition 钩子：子列表进入时，从高度 0 过渡到实际高度 */
+const onSlideEnter = (el: Element) => {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.height = '0';
+  htmlEl.style.overflow = 'hidden';
+  /* 强制浏览器重排，确保起始状态生效后再设置目标高度 */
+  void htmlEl.offsetHeight;
+  htmlEl.style.height = htmlEl.scrollHeight + 'px';
+  htmlEl.style.transition = `height 0.3s ease`;
+};
+
+/** Transition 钩子：进入动画结束后，清除内联样式恢复正常流布局 */
+const onSlideAfterEnter = (el: Element) => {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.height = '';
+  htmlEl.style.overflow = '';
+  htmlEl.style.transition = '';
+};
+
+/** Transition 钩子：子列表离开时，从实际高度过渡到 0 */
+const onSlideLeave = (el: Element) => {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.height = htmlEl.scrollHeight + 'px';
+  htmlEl.style.overflow = 'hidden';
+  /* 强制浏览器重排，确保起始高度生效后再折叠 */
+  void htmlEl.offsetHeight;
+  htmlEl.style.height = '0';
+  htmlEl.style.transition = `height 0.3s ease`;
 };
 
 /** 点击菜单项：更新 store 并导航到邮件列表页 */
@@ -250,14 +289,19 @@ const handleClearSearch = function () {
   background-color: var(--ifm-background-hover-color);
 }
 
-/* 折叠箭头图标 */
+/* 折叠箭头图标：展开时旋转 90 度，使用 transform 过渡实现平滑动画 */
 .menu__group-arrow {
   font-size: 10px;
   width: 16px;
   text-align: center;
   flex-shrink: 0;
   color: var(--ifm-color-content-secondary);
-  transition: transform var(--ifm-transition-fast);
+  transition: transform 0.3s ease;
+}
+
+/* 箭头展开状态：▶ 旋转 90 度变为向下 */
+.menu__group-arrow--expanded {
+  transform: rotate(90deg);
 }
 
 /* 子节点列表：带左侧竖线指示层级关系 */
