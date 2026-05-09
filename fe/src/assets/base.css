@@ -248,6 +248,11 @@ a:hover {
   border-color: var(--ifm-color-primary-dark);
 }
 
+/* plain primary 按钮：全局覆盖背景为实色绿后，文字需强制白色以保证可见性 */
+.el-button--primary.is-plain {
+  color: #fff;
+}
+
 /* 输入框 */
 .el-input__wrapper,
 .el-textarea__inner,

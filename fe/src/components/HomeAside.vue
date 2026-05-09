@@ -16,7 +16,7 @@
       <el-input
         v-model="searchQuery"
         :placeholder="lang.search"
-        prefix-icon="Search"
+        :prefix-icon="Search"
         clearable
         size="default"
         @keyup.enter="handleSearch"
@@ -95,7 +95,7 @@ import { ref, watch, computed, reactive } from "vue";
 import useGroupStore from "../stores/group";
 import lang from "../i18n/i18n";
 import { groupService } from "@/services/groupService";
-import { Setting } from "@element-plus/icons-vue";
+import { Setting, Search } from "@element-plus/icons-vue";
 import { useGlobalStatusStore } from "../stores/useGlobalStatusStore";
 import { useSettingsDrawer } from "@/composables/useSettingsDrawer";
 import type { GroupItem } from "@/types/api";
