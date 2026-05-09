@@ -4,6 +4,8 @@
   改造原因: 移除 glassmorphism，改为纯色简洁风格
   改造日期: 20260509
   改造原因: 支持树形折叠菜单，"全部邮件数据"作为可展开/折叠的分组标题
+  改造日期: 20260509
+  改造原因: 子文件夹列表添加左侧竖线，指示层级关系
   ============================================================ -->
 <template>
   <div class="sidebar">
@@ -258,11 +260,24 @@ const handleClearSearch = function () {
   transition: transform var(--ifm-transition-fast);
 }
 
-/* 子节点列表：带左侧缩进 */
+/* 子节点列表：带左侧竖线指示层级关系 */
 .menu__sub-list {
   list-style: none;
   padding: 0;
+  padding-left: 20px;
   margin: 0;
+  position: relative;
+}
+
+/* 左侧竖线：伪元素绘制，颜色与全局边框色一致 */
+.menu__sub-list::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--ifm-border-color);
 }
 
 /* 底部 */
