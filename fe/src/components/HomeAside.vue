@@ -280,4 +280,3 @@ const handleClearSearch = function () {
   color: var(--ifm-color-content);
 }
 </style>
-</write_to_file>
