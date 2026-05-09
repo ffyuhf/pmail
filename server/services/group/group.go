@@ -3,6 +3,8 @@ package group
 import (
 	errors2 "errors"
 	"fmt"
+	"strings"
+
 	"github.com/ffyuhf/pmail/consts"
 	"github.com/ffyuhf/pmail/db"
 	"github.com/ffyuhf/pmail/dto"
@@ -12,7 +14,6 @@ import (
 	"github.com/ffyuhf/pmail/utils/context"
 	"github.com/ffyuhf/pmail/utils/errors"
 	log "github.com/sirupsen/logrus"
-	"strings"
 	"xorm.io/builder"
 )
 
@@ -24,6 +25,11 @@ type GroupItem struct {
 }
 
 func CreateGroup(ctx *context.Context, name string, parentId int) (*models.Group, error) {
+	// 修改日期: 20260510 — 如果父级文件夹已包含邮件，则拒绝创建子文件夹
+	if parentId > 0 && HasMails(ctx, parentId) {
+		return nil, errors2.New("cannot create subfolder in a folder that already contains emails")
+	}
+
 	// 先查询是否存在
 	var group models.Group
 	db.Instance.Table("group").Where("name = ? and user_id = ?", name, ctx.UserID).Get(&group)
@@ -119,22 +125,30 @@ func GetGroupInfoList(ctx *context.Context) []*GroupItem {
 	return buildChildren(ctx, 0)
 }
 
-// MoveMailToGroup 将某封邮件移动到某个分组中
-func MoveMailToGroup(ctx *context.Context, mailId []int, groupId int) bool {
+// MoveMailToGroup 将邮件移动到指定分组中
+// 修改日期: 20260510 — 增加子文件夹校验，含有子文件夹的分组不允许直接放置邮件
+// 返回值：bool 表示是否成功移动，string 表示错误信息
+func MoveMailToGroup(ctx *context.Context, mailId []int, groupId int) (bool, string) {
+	// 检查目标分组是否含有子文件夹，含有子文件夹的根分组不允许放置邮件
+	if HasChildren(ctx, groupId) {
+		log.WithContext(ctx).Warnf("Attempt to move mail to group %d which has children", groupId)
+		return false, "Cannot move mail to a folder that contains subfolders"
+	}
+
 	res, err := db.Instance.Exec(db.WithContext(ctx,
 		fmt.Sprintf("update user_email set group_id=? where email_id in (%s) and user_id =?", array.Join(mailId, ","))),
 		groupId, ctx.UserID)
 	if err != nil {
 		log.WithContext(ctx).Errorf("SQL Error:%+v", err)
-		return false
+		return false, "SQL Error"
 	}
 	rowNum, err := res.RowsAffected()
 	if err != nil {
 		log.WithContext(ctx).Errorf("SQL Error:%+v", err)
-		return false
+		return false, "SQL Error"
 	}
 
-	return rowNum > 0
+	return rowNum > 0, ""
 }
 
 func buildChildren(ctx *context.Context, parentId int) []*GroupItem {
@@ -165,10 +179,21 @@ func GetGroupList(ctx *context.Context) []*models.Group {
 	return ret
 }
 
-func hasChildren(ctx *context.Context, id int) bool {
+// HasChildren 检查指定分组是否包含子文件夹
+// 修改日期: 20260510 — 导出函数供 move/copy 校验使用
+func HasChildren(ctx *context.Context, id int) bool {
 	var parent []*models.Group
 	db.Instance.Table("group").Where("parent_id=?", id).Find(&parent)
 	return len(parent) > 0
+}
+
+// HasMails 检查指定分组是否已包含邮件
+// 修改日期: 20260510 — 用于 CreateGroup 校验，含邮件的文件夹不允许创建子文件夹
+func HasMails(ctx *context.Context, groupId int) bool {
+	var count int
+	db.Instance.Table("user_email").Select("count(1)").
+		Where("group_id=? and user_id=?", groupId, ctx.UserID).Get(&count)
+	return count > 0
 }
 
 func getLayerName(ctx *context.Context, item *models.Group, allPath bool) string {
