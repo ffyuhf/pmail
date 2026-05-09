@@ -2,6 +2,8 @@
   PMail — Sidebar 侧边栏（Docusaurus 风格）
   改造日期: 20250425
   改造原因: 移除 glassmorphism，改为纯色简洁风格
+  改造日期: 20260509
+  改造原因: 支持树形折叠菜单，"全部邮件数据"作为可展开/折叠的分组标题
   ============================================================ -->
 <template>
   <div class="sidebar">
@@ -18,21 +20,50 @@
       />
     </div>
 
-    <!-- 菜单列表 -->
+    <!-- 菜单列表：树形结构渲染 -->
     <nav class="sidebar__menu">
       <ul class="menu__list">
         <li
-          v-for="item in data"
-          :key="item.tag"
+          v-for="item in treeData"
+          :key="item.label"
           class="menu__list-item"
         >
-          <a
-            class="menu__link"
-            :class="{ 'menu__link--active': activeGroup === item.tag }"
-            @click="handleMenuSelect(item.tag)"
-          >
-            {{ item.label }}
-          </a>
+          <!-- 有子节点：渲染为可折叠分组标题 -->
+          <template v-if="item.children && item.children.length > 0">
+            <a
+              class="menu__group-title"
+              @click="toggleGroup(item.label)"
+            >
+              <span class="menu__group-arrow">{{ expandedGroups[item.label] ? '▼' : '▶' }}</span>
+              <span>{{ item.label }}</span>
+            </a>
+            <!-- 子节点列表 -->
+            <ul v-show="expandedGroups[item.label]" class="menu__sub-list">
+              <li
+                v-for="child in item.children"
+                :key="child.tag"
+                class="menu__list-item"
+              >
+                <a
+                  class="menu__link"
+                  :class="{ 'menu__link--active': activeGroup === child.tag }"
+                  @click="handleMenuSelect(child)"
+                >
+                  {{ child.label }}
+                </a>
+              </li>
+            </ul>
+          </template>
+          <!-- 无子节点：渲染为普通菜单项 -->
+          <template v-else>
+            <a
+              class="menu__link"
+              :class="{ 'menu__link--active': activeGroup === item.tag }"
+              @click="handleMenuSelect(item)"
+            >
+              {{ item.label }}
+            </a>
+          </template>
         </li>
       </ul>
     </nav>
@@ -49,7 +80,7 @@
 
 <script setup lang="ts">
 import { useRouter } from "vue-router";
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, reactive } from "vue";
 import useGroupStore from "../stores/group";
 import lang from "../i18n/i18n";
 import { groupService } from "@/services/groupService";
@@ -60,38 +91,44 @@ import type { GroupItem } from "@/types/api";
 
 const groupStore = useGroupStore();
 const globalStatus = useGlobalStatusStore();
-const {openSettings} = useSettingsDrawer();
+const { openSettings } = useSettingsDrawer();
 const isLogin = computed(() => globalStatus.isLogin);
 const router = useRouter();
-const data = ref<GroupItem[]>([]);
+
+/** 树形分组数据（保留嵌套结构，不再扁平化） */
+const treeData = ref<GroupItem[]>([]);
 const searchQuery = ref("");
 const activeGroup = ref(groupStore.tag);
+
+/** 各分组的展开/折叠状态，key 为分组 label */
+const expandedGroups = reactive<Record<string, boolean>>({});
 
 // 保持活动菜单与 store 同步
 watch(() => groupStore.tag, (newVal) => {
   activeGroup.value = newVal;
 });
 
-/** 通过 groupService 获取分组树 */
+/** 通过 groupService 获取分组树，保留原始嵌套结构 */
 groupService.getGroupTree().then((res: any) => {
   if (res.data) {
-    const list: GroupItem[] = [];
-    const traverse = (items: GroupItem[]) => {
-      items.forEach(node => {
-        list.push(node);
-        if(node.children) traverse(node.children);
-      });
+    treeData.value = res.data;
+    // 默认展开第一个分组（"全部邮件数据"），确保用户首次看到常用文件夹
+    if (res.data.length > 0) {
+      expandedGroups[res.data[0].label] = true;
     }
-    traverse(res.data);
-    data.value = list;
   }
 });
 
-const handleMenuSelect = function (index: string) {
-  const selected = data.value.find(d => d.tag === index);
-  if (selected) {
-    groupStore.name = selected.label;
-    groupStore.tag = selected.tag;
+/** 切换分组的展开/折叠状态 */
+const toggleGroup = function (label: string) {
+  expandedGroups[label] = !expandedGroups[label];
+};
+
+/** 点击菜单项：更新 store 并导航到邮件列表页 */
+const handleMenuSelect = function (item: GroupItem) {
+  if (item.tag) {
+    groupStore.name = item.label;
+    groupStore.tag = item.tag;
     router.push({ name: "list" });
   }
 };
@@ -106,7 +143,6 @@ const handleClearSearch = function () {
   searchQuery.value = "";
   groupStore.keyword = "";
 };
-
 </script>
 
 <style scoped>
@@ -191,6 +227,44 @@ const handleClearSearch = function () {
   color: var(--ifm-color-primary);
 }
 
+/* 分组标题（可折叠） */
+.menu__group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ifm-spacing-sm);
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--ifm-color-content);
+  border-radius: var(--ifm-global-radius);
+  cursor: pointer;
+  text-decoration: none;
+  user-select: none;
+  transition: background-color var(--ifm-transition-fast);
+}
+
+.menu__group-title:hover {
+  background-color: var(--ifm-background-hover-color);
+}
+
+/* 折叠箭头图标 */
+.menu__group-arrow {
+  font-size: 10px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  color: var(--ifm-color-content-secondary);
+  transition: transform var(--ifm-transition-fast);
+}
+
+/* 子节点列表：带左侧缩进 */
+.menu__sub-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
 /* 底部 */
 .sidebar__footer {
   padding: var(--ifm-spacing-sm) var(--ifm-spacing-md);
@@ -206,3 +280,4 @@ const handleClearSearch = function () {
   color: var(--ifm-color-content);
 }
 </style>
+</write_to_file>
