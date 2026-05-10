@@ -36,12 +36,16 @@ interface EmailMoveParams {
   group_id: string
   group_name: string
   ids: number[]
+  /** user_email.id 数组，精确匹配记录。新增日期: 20260510 */
+  ue_ids: number[]
 }
 
 /** 邮件删除参数 */
 interface EmailDeleteParams {
   ids: number[]
   forcedDel: boolean
+  /** user_email.id 数组，精确匹配记录。新增日期: 20260510 */
+  ue_ids: number[]
 }
 
 /**

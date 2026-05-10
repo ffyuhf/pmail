@@ -28,6 +28,8 @@ export interface EmailContact {
 /** 邮件列表项 */
 export interface EmailListItem {
   id: number;
+  /** user_email 表主键 ID，用于精确操作（删除/移动）。新增日期: 20260510 */
+  ue_id: number;
   /** 邮件类型：0=接收, 1=发送。新增日期: 20260510 — 自定义文件夹需区分发送/接收邮件 */
   type: number;
   sender: EmailContact;

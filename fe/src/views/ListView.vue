@@ -237,7 +237,16 @@ const toggleSelectAll = (val: boolean | string) => {
   }
 }
 
-/** 获取当前表格选中行的邮件 ID 列表（公共逻辑提取） */
+/** 获取选中行的 ue_id 列表（user_email.id，精确匹配记录）。修改日期: 20260510 */
+const getSelectedUeIds = (): number[] | null => {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('Select emails first');
+    return null;
+  }
+  return selectedRows.value.map((e: EmailListItem) => e.ue_id);
+}
+
+/** 获取选中行的 email id 列表（用于标记已读等旧接口）。修改日期: 20260510 */
 const getSelectedIds = (): number[] | null => {
   if (selectedRows.value.length === 0) {
     ElMessage.warning('Select emails first');
@@ -266,7 +275,8 @@ const move = function (group_id: string, group_name: string) {
   ElMessageBox.confirm(lang.move_email_confirm, 'Warning', {
     confirmButtonText: 'OK', cancelButtonText: 'Cancel', type: 'warning'
   }).then(() => {
-    emailService.moveEmails({group_id, group_name, ids}).then((res: any) => {
+    // 修改日期: 20260510 — 使用 ue_ids 精确匹配 user_email 记录
+  emailService.moveEmails({group_id, group_name, ids: [], ue_ids: getSelectedUeIds()!}).then((res: any) => {
       if (res.errorNo === 0) {
         updateList()
         ElMessage.success('Move completed')
@@ -287,7 +297,8 @@ const del = function () {
   ElMessageBox.confirm(lang.del_email_confirm, 'Warning', {
     confirmButtonText: 'OK', cancelButtonText: 'Cancel', type: 'warning'
   }).then(() => {
-    emailService.deleteEmails({ids, forcedDel}).then((res: any) => {
+    // 修改日期: 20260510 — 使用 ue_ids 精确匹配 user_email 记录
+    emailService.deleteEmails({ids: [], forcedDel, ue_ids: getSelectedUeIds()!}).then((res: any) => {
       if (res.errorNo === 0) {
         updateList()
         ElMessage.success('Deleted successfully')
@@ -492,16 +503,16 @@ const handlePageSizeChange = function () {
   line-height: 1;
 }
 
-/* 发送邮件标签：蓝色 */
+/* 发送邮件标签：蓝色。修改日期: 20260510 — 使用明确色值确保在自定义文件夹中正常显示 */
 .mail-list__type-tag--sent {
-  color: var(--ifm-color-primary);
-  background-color: var(--ifm-color-primary-light);
+  color: #1890ff;
+  background-color: #e6f7ff;
 }
 
-/* 接收邮件标签：灰色 */
+/* 接收邮件标签：灰色。修改日期: 20260510 — 使用明确色值确保在自定义文件夹中正常显示 */
 .mail-list__type-tag--received {
-  color: var(--ifm-color-content-secondary);
-  background-color: var(--ifm-color-emphasis-200);
+  color: #999;
+  background-color: #f5f5f5;
 }
 
 /* 未读行加粗 */
