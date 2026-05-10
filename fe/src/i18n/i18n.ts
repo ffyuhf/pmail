@@ -127,7 +127,21 @@ let lang = {
     "login_fill_required": "Please fill in both fields",
     "select_all": "Select All",
     "selected_count": "selected",
-    "per_page": "Per Page"
+    "per_page": "Per Page",
+    "csv_import": "CSV Import",
+    "csv_import_desc": "Upload a CSV file to quickly add recipients",
+    "csv_upload_area": "Drag a CSV file here, or click to upload",
+    "csv_target_field": "Import to",
+    "csv_preview": "Preview",
+    "csv_no_email_found": "No valid email addresses found in the CSV file",
+    "csv_import_success": "Successfully imported {count} email address(es)",
+    "csv_file_too_large": "File size cannot exceed 5MB",
+    "csv_select_all": "Select All",
+    "csv_deselect_all": "Deselect All",
+    "csv_selected_count": "{count} selected",
+    "csv_name_col": "Name",
+    "csv_email_col": "Email",
+    "csv_confirm_import": "Confirm Import"
 };
 
 
@@ -260,7 +274,21 @@ const zhCN = {
     "login_fill_required": "请填写账号和密码",
     "select_all": "全选",
     "selected_count": "已选",
-    "per_page": "每页显示"
+    "per_page": "每页显示",
+    "csv_import": "CSV 导入",
+    "csv_import_desc": "上传 CSV 文件快速添加收件人",
+    "csv_upload_area": "将 CSV 文件拖到此处，或点击上传",
+    "csv_target_field": "导入到",
+    "csv_preview": "预览",
+    "csv_no_email_found": "CSV 文件中未找到有效的邮箱地址",
+    "csv_import_success": "成功导入 {count} 个邮箱地址",
+    "csv_file_too_large": "文件大小不能超过 5MB",
+    "csv_select_all": "全选",
+    "csv_deselect_all": "取消全选",
+    "csv_selected_count": "已选 {count} 项",
+    "csv_name_col": "姓名",
+    "csv_email_col": "邮箱",
+    "csv_confirm_import": "确认导入"
 }
 
 const browserLang = (navigator.languages && navigator.languages[0]) || navigator.language || "en";

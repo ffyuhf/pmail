@@ -8,6 +8,9 @@
         <h2 class="composer__title">{{ lang.compose }}</h2>
       </div>
       <div class="composer__actions">
+        <el-button class="composer__action-btn" @click="openCsvDialog">
+          <el-icon><Upload /></el-icon> {{ lang.csv_import }}
+        </el-button>
         <el-button class="composer__action-btn" @click="upload">
           <el-icon><Paperclip /></el-icon> {{ lang.add_att }}
         </el-button>
@@ -112,14 +115,93 @@
         </div>
       </el-form>
     </div>
+
+    <!-- CSV 导入对话框 -->
+    <el-dialog
+      v-model="csvDialogVisible"
+      :title="lang.csv_import"
+      width="680px"
+      destroy-on-close
+      class="csv-dialog"
+    >
+      <!-- 文件上传区域 -->
+      <div
+        class="csv-upload-area"
+        :class="{ 'csv-upload-area--dragover': csvDragOver }"
+        @dragover.prevent="csvDragOver = true"
+        @dragleave.prevent="csvDragOver = false"
+        @drop.prevent="handleCsvDrop"
+        @click="triggerCsvFileInput"
+      >
+        <el-icon class="csv-upload-area__icon" :size="40"><Upload /></el-icon>
+        <p class="csv-upload-area__text">{{ lang.csv_upload_area }}</p>
+        <p class="csv-upload-area__hint">CSV (*.csv)</p>
+        <input v-show="false" ref="csvFileRef" type="file" accept=".csv" @change="handleCsvFileChange">
+      </div>
+
+      <!-- 目标字段选择 + 统计信息 -->
+      <div class="csv-toolbar" v-if="csvRecipients.length > 0">
+        <div class="csv-toolbar__left">
+          <span class="csv-toolbar__label">{{ lang.csv_target_field }}</span>
+          <el-select v-model="csvTargetField" style="width: 120px">
+            <el-option value="to" :label="lang.to" />
+            <el-option value="cc" :label="lang.cc" />
+            <el-option value="bcc" :label="lang.bcc" />
+          </el-select>
+        </div>
+        <div class="csv-toolbar__right">
+          <el-button size="small" @click="csvToggleSelectAll">
+            {{ csvAllSelected ? lang.csv_deselect_all : lang.csv_select_all }}
+          </el-button>
+          <span class="csv-toolbar__count">
+            {{ lang.csv_selected_count.replace('{count}', String(csvSelectedCount)) }}
+          </span>
+        </div>
+      </div>
+
+      <!-- 预览表格 -->
+      <el-table
+        v-if="csvRecipients.length > 0"
+        :data="csvRecipients"
+        class="csv-preview-table"
+        max-height="320px"
+        @selection-change="handleCsvSelectionChange"
+        ref="csvTableRef"
+      >
+        <el-table-column type="selection" width="50" />
+        <el-table-column property="name" :label="lang.csv_name_col" min-width="120">
+          <template #default="{ row }">
+            {{ row.name || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column property="email" :label="lang.csv_email_col" min-width="220" />
+      </el-table>
+
+      <!-- 解析结果为空时的提示 -->
+      <div class="csv-empty" v-if="csvParseFailed">
+        <el-icon :size="32" color="#f56c6c"><CircleCloseFilled /></el-icon>
+        <p>{{ lang.csv_no_email_found }}</p>
+      </div>
+
+      <template #footer>
+        <el-button @click="csvDialogVisible = false">{{ lang.fail === 'Fail!' ? 'Cancel' : '取消' }}</el-button>
+        <el-button
+          type="primary"
+          :disabled="csvSelectedCount === 0"
+          @click="confirmCsvImport"
+        >
+          {{ lang.csv_confirm_import }} ({{ csvSelectedCount }})
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import '@wangeditor/editor/dist/css/style.css'
 import {ElMessage} from 'element-plus'
-import {onBeforeUnmount, reactive, ref, shallowRef} from 'vue'
-import {Close, Paperclip, Position, ArrowDown, Document, ArrowLeft} from '@element-plus/icons-vue';
+import {computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef} from 'vue'
+import {Close, Paperclip, Position, ArrowDown, Document, ArrowLeft, Upload, CircleCloseFilled} from '@element-plus/icons-vue';
 import lang from '../i18n/i18n';
 import {Editor, Toolbar} from '@wangeditor/editor-for-vue'
 import {i18nChangeLanguage} from '@wangeditor/editor'
@@ -128,6 +210,8 @@ import {emailService} from "@/services/emailService";
 import useGroupStore from '../stores/group'
 import {useGlobalStatusStore} from "@/stores/useGlobalStatusStore";
 import {createStringEmailValidator} from "@/utils/validators";
+import {parseCsv, readCsvFile} from "@/utils/csvParser";
+import type {CsvRecipient} from "@/utils/csvParser";
 
 const router = useRouter();
 const groupStore = useGroupStore()
@@ -297,6 +381,139 @@ const fileChange = function (e: any) {
 
 const delFile = function (index: number) {
   fileList.splice(index, 1);
+}
+
+// ============ CSV 导入功能 ============
+
+/** CSV 对话框可见性 */
+const csvDialogVisible = ref(false);
+
+/** CSV 文件输入框引用 */
+const csvFileRef = ref();
+
+/** CSV 拖拽悬停状态 */
+const csvDragOver = ref(false);
+
+/** CSV 解析出的收件人列表 */
+const csvRecipients = ref<CsvRecipient[]>([]);
+
+/** CSV 选中的收件人列表 */
+const csvSelectedRecipients = ref<CsvRecipient[]>([]);
+
+/** CSV 选中数量 */
+const csvSelectedCount = computed(() => csvSelectedRecipients.value.length);
+
+/** 是否全选 */
+const csvAllSelected = computed(() =>
+  csvRecipients.value.length > 0 && csvSelectedRecipients.value.length === csvRecipients.value.length
+);
+
+/** 解析失败标记 */
+const csvParseFailed = ref(false);
+
+/** 导入目标字段（to/cc/bcc） */
+const csvTargetField = ref<'to' | 'cc' | 'bcc'>('to');
+
+/** 表格引用 */
+const csvTableRef = ref();
+
+/** 打开 CSV 导入对话框 */
+const openCsvDialog = function () {
+  csvDialogVisible.value = true;
+  csvRecipients.value = [];
+  csvSelectedRecipients.value = [];
+  csvParseFailed.value = false;
+  csvTargetField.value = 'to';
+}
+
+/** 触发 CSV 文件选择 */
+const triggerCsvFileInput = function () {
+  csvFileRef.value?.dispatchEvent(new MouseEvent('click'));
+}
+
+/** 处理 CSV 文件选择事件 */
+const handleCsvFileChange = async function (e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  await processCsvFile(file);
+  // 重置 input，允许再次选择同一文件
+  input.value = '';
+}
+
+/** 处理 CSV 文件拖拽放置 */
+const handleCsvDrop = async function (e: DragEvent) {
+  csvDragOver.value = false;
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  await processCsvFile(file);
+}
+
+/** 解析 CSV 文件并更新预览列表 */
+const processCsvFile = async function (file: File) {
+  // 文件大小校验（5MB）
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.warning(lang.csv_file_too_large);
+    return;
+  }
+
+  try {
+    const text = await readCsvFile(file);
+    const result = parseCsv(text);
+
+    csvRecipients.value = result.recipients;
+    csvSelectedRecipients.value = [];
+    csvParseFailed.value = result.recipients.length === 0 && result.totalRows > 0;
+
+    // 默认全选：等表格渲染后勾选所有行
+    if (result.recipients.length > 0) {
+      nextTick(() => {
+        csvTableRef.value?.toggleAllSelection?.();
+      });
+    }
+  } catch (err) {
+    ElMessage.error(String(err));
+    csvRecipients.value = [];
+    csvParseFailed.value = true;
+  }
+}
+
+/** 处理表格选中变化 */
+const handleCsvSelectionChange = function (selection: CsvRecipient[]) {
+  csvSelectedRecipients.value = selection;
+}
+
+/** 切换全选/取消全选 */
+const csvToggleSelectAll = function () {
+  csvTableRef.value?.toggleAllSelection?.();
+}
+
+/** 确认导入：将选中的邮箱追加到目标字段 */
+const confirmCsvImport = function () {
+  if (csvSelectedRecipients.value.length === 0) return;
+
+  const emailsToAdd = csvSelectedRecipients.value.map(r => r.email);
+
+  // 根据目标字段追加到对应数组（去重）
+  const targetArray = csvTargetField.value === 'to'
+    ? ruleForm.receivers
+    : csvTargetField.value === 'cc'
+      ? ruleForm.cc
+      : ruleForm.bcc;
+
+  const existingSet = new Set(targetArray.map(e => e.toLowerCase()));
+  let addedCount = 0;
+
+  for (const email of emailsToAdd) {
+    if (!existingSet.has(email.toLowerCase())) {
+      targetArray.push(email);
+      existingSet.add(email.toLowerCase());
+      addedCount++;
+    }
+  }
+
+  ElMessage.success(lang.csv_import_success.replace('{count}', String(addedCount)));
+  csvDialogVisible.value = false;
 }
 </script>
 
@@ -646,5 +863,100 @@ const delFile = function (index: number) {
   .composer__header {
     padding: 12px 16px;
   }
+}
+
+/* ===== CSV 导入对话框样式 ===== */
+
+/* 文件上传拖拽区域 */
+.csv-upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+  border: 2px dashed var(--ifm-border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s;
+  background: var(--ifm-background-surface-color);
+}
+
+.csv-upload-area:hover {
+  border-color: var(--ifm-color-primary);
+  background: var(--ifm-background-color);
+}
+
+.csv-upload-area--dragover {
+  border-color: var(--ifm-color-primary);
+  background: rgba(var(--ifm-color-primary-rgb, 0, 113, 227), 0.06);
+}
+
+.csv-upload-area__icon {
+  color: var(--ifm-color-content-muted);
+  margin-bottom: 8px;
+}
+
+.csv-upload-area__text {
+  color: var(--ifm-color-content-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+.csv-upload-area__hint {
+  color: var(--ifm-color-content-muted);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+/* CSV 工具栏：目标字段选择 + 全选/统计 */
+.csv-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 8px 0;
+}
+
+.csv-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.csv-toolbar__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ifm-color-content-secondary);
+}
+
+.csv-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.csv-toolbar__count {
+  font-size: 13px;
+  color: var(--ifm-color-content-secondary);
+}
+
+/* CSV 预览表格 */
+.csv-preview-table {
+  margin-top: 12px;
+}
+
+/* CSV 空状态 */
+.csv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 0;
+  color: var(--ifm-color-content-secondary);
+}
+
+.csv-empty p {
+  margin-top: 8px;
+  font-size: 14px;
 }
 </style>
