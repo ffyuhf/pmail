@@ -75,6 +75,9 @@
           <template #default="scope">
             <div class="mail-list__row" :class="{'mail-list__row--unread': !scope.row.is_read}">
               <div class="mail-list__row-main">
+                <!-- 邮件类型标签：自定义文件夹中区分发送/接收邮件。修改日期: 20260510 -->
+                <span v-if="scope.row.type === 1" class="mail-list__type-tag mail-list__type-tag--sent" :title="lang.outbox || 'Sent'">↗</span>
+                <span v-else class="mail-list__type-tag mail-list__type-tag--received" :title="lang.inbox || 'Received'">↙</span>
                 <div class="mail-list__sender">
                   {{ scope.row.sender.Name !== '' ? scope.row.sender.Name : scope.row.sender.EmailAddress }}
                 </div>
@@ -473,6 +476,32 @@ const handlePageSizeChange = function () {
 .mail-list__date {
   font-size: 12px;
   color: var(--ifm-color-content-secondary);
+}
+
+/* 邮件类型标签：区分发送/接收邮件。新增日期: 20260510 */
+.mail-list__type-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* 发送邮件标签：蓝色 */
+.mail-list__type-tag--sent {
+  color: var(--ifm-color-primary);
+  background-color: var(--ifm-color-primary-light);
+}
+
+/* 接收邮件标签：灰色 */
+.mail-list__type-tag--received {
+  color: var(--ifm-color-content-secondary);
+  background-color: var(--ifm-color-emphasis-200);
 }
 
 /* 未读行加粗 */

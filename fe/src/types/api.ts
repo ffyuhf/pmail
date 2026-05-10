@@ -28,6 +28,8 @@ export interface EmailContact {
 /** 邮件列表项 */
 export interface EmailListItem {
   id: number;
+  /** 邮件类型：0=接收, 1=发送。新增日期: 20260510 — 自定义文件夹需区分发送/接收邮件 */
+  type: number;
   sender: EmailContact;
   title: string;
   desc: string;
