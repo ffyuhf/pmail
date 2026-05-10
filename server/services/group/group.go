@@ -126,17 +126,18 @@ func GetGroupInfoList(ctx *context.Context) []*GroupItem {
 }
 
 // MoveMailToGroup 将邮件移动到指定分组中
-// 修改日期: 20260510 — 增加子文件夹校验，含有子文件夹的分组不允许直接放置邮件
+// 修改日期: 20260510 — 改用 ueIds（user_email.id）精确匹配记录，避免影响其他文件夹中的副本
 // 返回值：bool 表示是否成功移动，string 表示错误信息
-func MoveMailToGroup(ctx *context.Context, mailId []int, groupId int) (bool, string) {
+func MoveMailToGroup(ctx *context.Context, ueIds []int, groupId int) (bool, string) {
 	// 检查目标分组是否含有子文件夹，含有子文件夹的根分组不允许放置邮件
 	if HasChildren(ctx, groupId) {
 		log.WithContext(ctx).Warnf("Attempt to move mail to group %d which has children", groupId)
 		return false, "Cannot move mail to a folder that contains subfolders"
 	}
 
+	// 使用 user_email.id（ueIds）精确匹配，避免影响同一 email_id 在其他文件夹中的记录
 	res, err := db.Instance.Exec(db.WithContext(ctx,
-		fmt.Sprintf("update user_email set group_id=? where email_id in (%s) and user_id =?", array.Join(mailId, ","))),
+		fmt.Sprintf("update user_email set group_id=? where id in (%s) and user_id =?", array.Join(ueIds, ","))),
 		groupId, ctx.UserID)
 	if err != nil {
 		log.WithContext(ctx).Errorf("SQL Error:%+v", err)
@@ -303,28 +304,31 @@ func getNextUID(ctx *context.Context, groupName string) int {
 	return lastId + 1
 }
 
+// getGroupNum 统计默认文件夹的邮件数量
+// 修改日期: 20260510 — 添加 group_id=0 过滤，确保已移到自定义文件夹的邮件不被重复统计
 func getGroupNum(ctx *context.Context, groupName string, mustUnread bool) int {
 	var count int
 	switch groupName {
 	case "INBOX":
 		if mustUnread {
-			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=0 and is_read=0", ctx.UserID).Get(&count)
+			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=0 and group_id=0 and is_read=0", ctx.UserID).Get(&count)
 		} else {
-			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=0", ctx.UserID).Get(&count)
+			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=0 and group_id=0", ctx.UserID).Get(&count)
 		}
 	case "Sent Messages":
 		if mustUnread {
 			count = 0
 		} else {
-			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=1", ctx.UserID).Get(&count)
+			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=1 and group_id=0", ctx.UserID).Get(&count)
 		}
 	case "Drafts":
 		if mustUnread {
-			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=4 and is_read=0", ctx.UserID).Get(&count)
+			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=4 and group_id=0 and is_read=0", ctx.UserID).Get(&count)
 		} else {
-			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=4", ctx.UserID).Get(&count)
+			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=4 and group_id=0", ctx.UserID).Get(&count)
 		}
 	case "Deleted Messages":
+		// Deleted Messages 按 status=3 查询，不限制 group_id（已删除邮件统一展示）
 		if mustUnread {
 			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=3 and is_read=0", ctx.UserID).Get(&count)
 		} else {
@@ -332,25 +336,27 @@ func getGroupNum(ctx *context.Context, groupName string, mustUnread bool) int {
 		}
 	case "Junk":
 		if mustUnread {
-			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=5 and is_read=0", ctx.UserID).Get(&count)
+			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=5 and group_id=0 and is_read=0", ctx.UserID).Get(&count)
 		} else {
-			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=5", ctx.UserID).Get(&count)
+			db.Instance.Table("user_email").Select("count(1)").Where("user_id=? and status=5 and group_id=0", ctx.UserID).Get(&count)
 		}
 	}
 	return count
 }
 
-func Move2DefaultBox(ctx *context.Context, mailIds []int, groupName string) error {
+// Move2DefaultBox 将邮件移动到默认文件夹
+// 修改日期: 20260510 — 改用 ueIds（user_email.id）精确匹配，避免影响其他文件夹中的副本
+func Move2DefaultBox(ctx *context.Context, ueIds []int, groupName string) error {
 	switch groupName {
 	case "Deleted Messages":
-		err := del_email.DelEmail(ctx, mailIds, false)
+		err := del_email.DelEmailByUeIds(ctx, ueIds, false)
 		if err != nil {
 			return err
 		}
 	case "INBOX":
 		_, err := db.Instance.Table(&models.UserEmail{}).Where(builder.Eq{
-			"user_id":  ctx.UserID,
-			"email_id": mailIds,
+			"user_id": ctx.UserID,
+			"id":      ueIds,
 		}).Update(map[string]interface{}{
 			"status":   consts.EmailTypeReceive,
 			"group_id": 0,
@@ -358,8 +364,8 @@ func Move2DefaultBox(ctx *context.Context, mailIds []int, groupName string) erro
 		return err
 	case "Sent Messages":
 		_, err := db.Instance.Table(&models.UserEmail{}).Where(builder.Eq{
-			"user_id":  ctx.UserID,
-			"email_id": mailIds,
+			"user_id": ctx.UserID,
+			"id":      ueIds,
 		}).Update(map[string]interface{}{
 			"status":   consts.EmailStatusSent,
 			"group_id": 0,
@@ -367,8 +373,8 @@ func Move2DefaultBox(ctx *context.Context, mailIds []int, groupName string) erro
 		return err
 	case "Drafts":
 		_, err := db.Instance.Table(&models.UserEmail{}).Where(builder.Eq{
-			"user_id":  ctx.UserID,
-			"email_id": mailIds,
+			"user_id": ctx.UserID,
+			"id":      ueIds,
 		}).Update(map[string]interface{}{
 			"status":   consts.EmailStatusDrafts,
 			"group_id": 0,
@@ -376,8 +382,8 @@ func Move2DefaultBox(ctx *context.Context, mailIds []int, groupName string) erro
 		return err
 	case "Junk":
 		_, err := db.Instance.Table(&models.UserEmail{}).Where(builder.Eq{
-			"user_id":  ctx.UserID,
-			"email_id": mailIds,
+			"user_id": ctx.UserID,
+			"id":      ueIds,
 		}).Update(map[string]interface{}{
 			"status":   consts.EmailStatusJunk,
 			"group_id": 0,

@@ -65,28 +65,41 @@ func (s *serverSession) Copy(numSet imap.NumSet, dest string) (*imap.CopyData, e
 	return &data, err
 }
 
+// copy2defaultbox 复制邮件到默认文件夹
+// 修改日期: 20260510 — 添加重复检查，避免同一 email_id+status+group_id 重复创建记录
 func copy2defaultbox(ctx *context.Context, mails []*response.EmailResponseData, dest string) (int, []int, error) {
 
 	var destUid []int
 	for _, email := range mails {
+		var status int8
+		switch dest {
+		case "Deleted Messages":
+			status = consts.EmailStatusDel
+		case "INBOX":
+			status = consts.EmailStatusWait
+		case "Sent Messages":
+			status = consts.EmailStatusSent
+		case "Drafts":
+			status = consts.EmailStatusDrafts
+		case "Junk":
+			status = consts.EmailStatusJunk
+		}
+
+		// 检查是否已存在相同的 email_id + status + group_id 记录
+		var existCount int
+		db.Instance.Table(&models.UserEmail{}).Select("count(1)").
+			Where("user_id=? and email_id=? and status=? and group_id=0", ctx.UserID, email.Id, status).
+			Get(&existCount)
+		if existCount > 0 {
+			continue // 跳过重复记录
+		}
 
 		newUe := models.UserEmail{
 			UserID:  ctx.UserID,
 			EmailID: email.Id,
 			IsRead:  email.IsRead,
 			GroupId: 0,
-		}
-		switch dest {
-		case "Deleted Messages":
-			newUe.Status = consts.EmailStatusDel
-		case "INBOX":
-			newUe.Status = consts.EmailStatusWait
-		case "Sent Messages":
-			newUe.Status = consts.EmailStatusSent
-		case "Drafts":
-			newUe.Status = consts.EmailStatusDrafts
-		case "Junk":
-			newUe.Status = consts.EmailStatusJunk
+			Status:  status,
 		}
 		db.Instance.Insert(&newUe)
 		destUid = append(destUid, newUe.ID)
@@ -95,6 +108,8 @@ func copy2defaultbox(ctx *context.Context, mails []*response.EmailResponseData, 
 	return models.GroupNameToCode[dest], destUid, nil
 }
 
+// copy2userbox 复制邮件到用户自定义文件夹
+// 修改日期: 20260510 — 添加重复检查，避免同一 email_id+group_id 重复创建记录
 func copy2userbox(ctx *context.Context, mails []*response.EmailResponseData, dest string) (int, []int, error) {
 	groupInfo, err := group.GetGroupByFullPath(ctx, dest)
 	if err != nil {
@@ -110,7 +125,7 @@ func copy2userbox(ctx *context.Context, mails []*response.EmailResponseData, des
 		}
 	}
 
-	// 修改日期: 20260510 — 检查目标分组是否含有子文件夹，含有子文件夹的分组不允许放置邮件
+	// 检查目标分组是否含有子文件夹，含有子文件夹的分组不允许放置邮件
 	if group.HasChildren(ctx, groupInfo.ID) {
 		return 0, nil, &imap.Error{
 			Type: imap.StatusResponseTypeNo,
@@ -120,6 +135,15 @@ func copy2userbox(ctx *context.Context, mails []*response.EmailResponseData, des
 
 	var destUid []int
 	for _, email := range mails {
+		// 检查是否已存在相同的 email_id + group_id 记录
+		var existCount int
+		db.Instance.Table(&models.UserEmail{}).Select("count(1)").
+			Where("user_id=? and email_id=? and group_id=?", ctx.UserID, email.Id, groupInfo.ID).
+			Get(&existCount)
+		if existCount > 0 {
+			continue // 跳过重复记录
+		}
+
 		newUe := models.UserEmail{
 			UserID:  ctx.UserID,
 			EmailID: email.Id,

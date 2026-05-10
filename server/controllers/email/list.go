@@ -22,7 +22,8 @@ type emailListResponse struct {
 
 type emilItem struct {
 	ID        int    `json:"id"`
-	Type      int8   `json:"type"` // 邮件类型：0=接收, 1=发送。修改日期: 20260510 — 自定义文件夹需区分发送/接收邮件
+	UeId      int    `json:"ue_id"` // user_email 表的主键 ID，用于精确定位记录。修改日期: 20260510
+	Type      int8   `json:"type"`  // 邮件类型：0=接收, 1=发送。修改日期: 20260510
 	Title     string `json:"title"`
 	Desc      string `json:"desc"`
 	Datetime  string `json:"datetime"`
@@ -84,7 +85,8 @@ func EmailList(ctx *context.Context, w http.ResponseWriter, req *http.Request) {
 
 		lst = append(lst, &emilItem{
 			ID:        email.Id,
-			Type:      email.Type, // 0=接收, 1=发送。修改日期: 20260510 — 自定义文件夹需区分邮件类型
+			UeId:      email.UeId, // user_email 记录 ID。修改日期: 20260510
+			Type:      email.Type, // 0=接收, 1=发送。修改日期: 20260510
 			Title:     email.Subject,
 			Desc:      email.Text.String,
 			Datetime:  email.SendDate.Format("2006-01-02 15:04:05"),

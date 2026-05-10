@@ -33,21 +33,22 @@ func (s *serverSession) Move(w *imapserver.MoveWriter, numSet imap.NumSet, dest 
 		}
 	}
 
-	var mailIds []int
+	// 修改日期: 20260510 — 使用 UeId（user_email.id）而非 email.Id，精确匹配记录
+	var ueIds []int
 	for _, email := range emailList {
-		mailIds = append(mailIds, email.Id)
+		ueIds = append(ueIds, email.UeId)
 	}
 
 	if group.IsDefaultBox(dest) {
-		return move2defaultbox(s.ctx, mailIds, dest)
+		return move2defaultbox(s.ctx, ueIds, dest)
 	} else {
-		return move2userbox(s.ctx, mailIds, dest)
+		return move2userbox(s.ctx, ueIds, dest)
 	}
 
 }
 
-func move2defaultbox(ctx *context.Context, mailIds []int, dest string) error {
-	err := group.Move2DefaultBox(ctx, mailIds, dest)
+func move2defaultbox(ctx *context.Context, ueIds []int, dest string) error {
+	err := group.Move2DefaultBox(ctx, ueIds, dest)
 	if err != nil {
 		return &imap.Error{
 			Type: imap.StatusResponseTypeNo,
@@ -57,7 +58,7 @@ func move2defaultbox(ctx *context.Context, mailIds []int, dest string) error {
 	return nil
 }
 
-func move2userbox(ctx *context.Context, mailIds []int, dest string) error {
+func move2userbox(ctx *context.Context, ueIds []int, dest string) error {
 	groupInfo, err := group.GetGroupByFullPath(ctx, dest)
 	if err != nil {
 		return &imap.Error{
@@ -80,7 +81,7 @@ func move2userbox(ctx *context.Context, mailIds []int, dest string) error {
 		}
 	}
 
-	_, _ = group.MoveMailToGroup(ctx, mailIds, groupInfo.ID)
+	_, _ = group.MoveMailToGroup(ctx, ueIds, groupInfo.ID)
 
 	return nil
 }
