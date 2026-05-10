@@ -2,6 +2,8 @@ package list
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/ffyuhf/pmail/db"
 	"github.com/ffyuhf/pmail/dto"
 	"github.com/ffyuhf/pmail/dto/response"
@@ -9,9 +11,9 @@ import (
 	"github.com/ffyuhf/pmail/utils/array"
 	"github.com/ffyuhf/pmail/utils/context"
 	log "github.com/sirupsen/logrus"
-	"strings"
+
+	. "xorm.io/builder"
 )
-import . "xorm.io/builder"
 
 func GetEmailList(ctx *context.Context, tagInfo dto.SearchTag, keyword string, pop3List bool, offset, limit int) (emailList []*response.EmailResponseData, total int64) {
 	return getList(ctx, tagInfo, keyword, pop3List, offset, limit)
@@ -51,7 +53,10 @@ func genSQL(ctx *context.Context, count bool, tagInfo dto.SearchTag, keyword str
 		sql += " and ue.status =? "
 		sqlParams = append(sqlParams, tagInfo.Status)
 	} else if tagInfo.Status == -1 {
-		if tagInfo.Type != 1 {
+		if tagInfo.GroupId != -1 {
+			// 自定义分组视图：不限制 status，展示该分组下所有状态的邮件
+			// 修复日期: 20260510 — 发件邮件(status=1)等非收件邮件在自定义文件夹中不可见的 Bug
+		} else if tagInfo.Type != 1 {
 			sql += " and ue.status = 0"
 		} else {
 			// 发件箱不展示已删除的邮件

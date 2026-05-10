@@ -2,15 +2,16 @@ package email
 
 import (
 	"encoding/json"
+	"io"
+	"math"
+	"net/http"
+
 	"github.com/ffyuhf/pmail/dto"
 	"github.com/ffyuhf/pmail/dto/response"
 	"github.com/ffyuhf/pmail/services/list"
 	"github.com/ffyuhf/pmail/utils/context"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
-	"io"
-	"math"
-	"net/http"
 )
 
 type emailListResponse struct {
@@ -21,6 +22,7 @@ type emailListResponse struct {
 
 type emilItem struct {
 	ID        int    `json:"id"`
+	Type      int8   `json:"type"` // 邮件类型：0=接收, 1=发送。修改日期: 20260510 — 自定义文件夹需区分发送/接收邮件
 	Title     string `json:"title"`
 	Desc      string `json:"desc"`
 	Datetime  string `json:"datetime"`
@@ -82,6 +84,7 @@ func EmailList(ctx *context.Context, w http.ResponseWriter, req *http.Request) {
 
 		lst = append(lst, &emilItem{
 			ID:        email.Id,
+			Type:      email.Type, // 0=接收, 1=发送。修改日期: 20260510 — 自定义文件夹需区分邮件类型
 			Title:     email.Subject,
 			Desc:      email.Text.String,
 			Datetime:  email.SendDate.Format("2006-01-02 15:04:05"),
