@@ -200,7 +200,7 @@
 <script setup lang="ts">
 import '@wangeditor/editor/dist/css/style.css'
 import {ElMessage} from 'element-plus'
-import {computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef} from 'vue'
+import {computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch} from 'vue'
 import {Close, Paperclip, Position, ArrowDown, Document, ArrowLeft, Upload, CircleCloseFilled} from '@element-plus/icons-vue';
 import lang from '../i18n/i18n';
 import {Editor, Toolbar} from '@wangeditor/editor-for-vue'
@@ -312,6 +312,17 @@ const fillReplyParams = function () {
     }
   }
 }
+
+/**
+ * 监听路由 query 变化：当从详情页回信跳转至编辑器时，
+ * 确保 fillReplyParams 被调用（双重保障，防止 transition 异常导致 init 回调未触发）。
+ * 新增日期: 20260516 v1.1
+ */
+watch(() => route.query, (newQuery: Record<string, string | string[] | undefined>) => {
+  if (newQuery.reply_to) {
+    fillReplyParams()
+  }
+})
 
 /** 发件人验证：前缀不能为空且不能包含 @ */
 const validateSender = function (rule: any, value: any, callback: any) {

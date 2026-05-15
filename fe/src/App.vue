@@ -56,7 +56,7 @@ const isFullBleed = computed(() => !showHeader.value || pageName.value === 'edit
       <div id="body" :class="{ 'full-bleed': isFullBleed }">
         <RouterView v-slot="{ Component }">
           <transition name="page-fade" mode="out-in">
-            <component :is="Component" />
+            <component :is="Component" :key="route.fullPath" />
           </transition>
         </RouterView>
       </div>
