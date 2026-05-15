@@ -143,8 +143,22 @@ const handleReply = () => {
     }
   }
 
-  /** 使用整页加载跳转，绕过 SPA transition 导致 wangeditor 初始化失败的问题 */
-  window.location.href = `#/editer?reply_to=${encodeURIComponent(replyTo)}&reply_subject=${encodeURIComponent(replySubject)}&reply_sender=${encodeURIComponent(replySender)}&reply_domain=${encodeURIComponent(replyDomain)}`
+  /**
+   * 先通过 SPA 路由跳转（确保 URL 和 query 参数正确更新），再强制整页刷新。
+   * 刷新后页面以全新状态加载，wangeditor 直接在可见状态下初始化，彻底避免 transition 空白问题。
+   * 修改日期: 20260516 v1.3
+   */
+  router.push({
+    name: 'editer',
+    query: {
+      reply_to: replyTo,
+      reply_subject: replySubject,
+      reply_sender: replySender,
+      reply_domain: replyDomain,
+    }
+  }).then(() => {
+    location.reload()
+  })
 }
 
 const handleDelete = () => {
