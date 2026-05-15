@@ -46,6 +46,8 @@ func GetEmailDetail(ctx *context.Context, id int, markRead bool) (*response.Emai
 	}
 
 	email.IsRead = ue.IsRead
+	// 修改日期: 20260516 — 返回 ue_id（user_email 表主键），供前端删除时精确匹配记录
+	email.UeId = ue.ID
 
 	if markRead && ue.IsRead == 0 {
 		ue.IsRead = 1
