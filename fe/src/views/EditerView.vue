@@ -101,9 +101,14 @@
           </el-form-item>
         </div>
 
-        <div class="composer__editor-wrapper">
+        <!-- 编辑器区域：v-if="editorReady" 延迟渲染，避免在 transition opacity:0 阶段初始化导致空白 -->
+        <div class="composer__editor-wrapper" v-if="editorReady">
           <Toolbar class="composer__editor-toolbar" :editor="editorRef" :defaultConfig="toolbarConfig" :mode="mode"/>
           <Editor class="composer__editor-content" v-model="valueHtml" :defaultConfig="editorConfig" :mode="mode" @onCreated="handleCreated"/>
+        </div>
+        <!-- 编辑器加载占位：transition 完成前显示加载提示 -->
+        <div class="composer__editor-wrapper composer__editor-loading" v-else>
+          <div class="composer__loading-placeholder">Loading editor...</div>
         </div>
 
         <div class="composer__attachments" v-if="fileList.length > 0">
@@ -200,7 +205,7 @@
 <script setup lang="ts">
 import '@wangeditor/editor/dist/css/style.css'
 import {ElMessage} from 'element-plus'
-import {computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch} from 'vue'
+import {computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch} from 'vue'
 import {Close, Paperclip, Position, ArrowDown, Document, ArrowLeft, Upload, CircleCloseFilled} from '@element-plus/icons-vue';
 import lang from '../i18n/i18n';
 import {Editor, Toolbar} from '@wangeditor/editor-for-vue'
@@ -219,6 +224,18 @@ const groupStore = useGroupStore()
 const globalStatus = useGlobalStatusStore();
 const showCcBcc = ref(false);
 const isFullscreen = ref(false);
+
+/**
+ * 编辑器延迟渲染控制：等待 App.vue 的 page-fade transition（250ms）完成后再挂载 wangeditor。
+ * wangeditor 在 opacity:0 的容器中初始化时 getBoundingClientRect() 返回尺寸为 0，导致编辑器空白。
+ * 延迟 300ms 确保组件完全可见后再创建编辑器实例。新增日期: 20260516 v1.2
+ */
+const editorReady = ref(false)
+onMounted(() => {
+  setTimeout(() => {
+    editorReady.value = true
+  }, 300)
+})
 
 if (lang.lang === "zhCn") {
   i18nChangeLanguage('zh-CN')
@@ -810,6 +827,20 @@ const confirmCsvImport = function () {
 
 .composer__editor-content :deep(.w-e-text-placeholder) {
   color: var(--ifm-color-content-muted) !important;
+}
+
+/* 编辑器加载占位符：transition 完成前的占位显示 */
+.composer__editor-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  background: var(--ifm-background-surface-color);
+}
+
+.composer__loading-placeholder {
+  color: var(--ifm-color-content-muted);
+  font-size: 14px;
 }
 
 /* 附件预览区 */
