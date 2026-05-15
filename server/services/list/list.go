@@ -53,9 +53,10 @@ func genSQL(ctx *context.Context, count bool, tagInfo dto.SearchTag, keyword str
 		sql += " and ue.status =? "
 		sqlParams = append(sqlParams, tagInfo.Status)
 	} else if tagInfo.Status == -1 {
-		if tagInfo.GroupId != -1 {
-			// 自定义分组视图：不限制 status，展示该分组下所有状态的邮件
-			// 修复日期: 20260510 — 发件邮件(status=1)等非收件邮件在自定义文件夹中不可见的 Bug
+		// 修复日期: 20260516 — 条件从 != -1 改为 > 0，避免 GroupId=0 的内置视图（收件箱/发件箱）跳过 status 过滤
+		// 根因：收件箱 Tag 的 GroupId=0，原条件 0!=-1 为 true 导致跳过 status 过滤，软删除后邮件仍显示在原文件夹
+		if tagInfo.GroupId > 0 {
+			// 自定义分组视图（GroupId > 0）：不限制 status，展示该分组下所有状态的邮件
 		} else if tagInfo.Type != 1 {
 			sql += " and ue.status = 0"
 		} else {
