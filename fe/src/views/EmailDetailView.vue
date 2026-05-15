@@ -118,7 +118,11 @@ const getInitial = (name: string) => {
   return name.charAt(0).toUpperCase();
 }
 
-/** 回信：跳转到发信页并自动填写发件人（原收件人）与收件人（原发件人）。新增日期: 20260516 */
+/**
+ * 回信：跳转到发信页并自动填写发件人（原收件人）与收件人（原发件人）。
+ * 使用 window.location.href 整页加载，避免 SPA 路由切换时 wangeditor 在 transition 动画中初始化失败导致空白。
+ * 修改日期: 20260516 v1.2
+ */
 const handleReply = () => {
   /** 收件人 = 原邮件的发件人地址 */
   const replyTo = detailData.value.from_address || ''
@@ -139,15 +143,8 @@ const handleReply = () => {
     }
   }
 
-  router.push({
-    name: 'editer',
-    query: {
-      reply_to: replyTo,
-      reply_subject: replySubject,
-      reply_sender: replySender,
-      reply_domain: replyDomain,
-    }
-  })
+  /** 使用整页加载跳转，绕过 SPA transition 导致 wangeditor 初始化失败的问题 */
+  window.location.href = `#/editer?reply_to=${encodeURIComponent(replyTo)}&reply_subject=${encodeURIComponent(replySubject)}&reply_sender=${encodeURIComponent(replySender)}&reply_domain=${encodeURIComponent(replyDomain)}`
 }
 
 const handleDelete = () => {
