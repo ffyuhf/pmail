@@ -6,6 +6,11 @@
         <el-icon><Back /></el-icon>
       </el-button>
       <div class="mail-detail__actions">
+        <!-- 回信按钮：仅收到的邮件（type === 0）才显示。新增日期: 20260516 -->
+        <el-button v-if="detailData.type === 0" plain @click="handleReply" class="mail-detail__reply-btn">
+          <el-icon><ChatRound /></el-icon>
+          <span class="mail-detail__reply-text">{{ lang.reply_email }}</span>
+        </el-button>
         <el-button plain @click="handleDelete">
           <el-icon><Delete /></el-icon>
         </el-button>
@@ -71,7 +76,7 @@
 <script setup lang="ts">
 import {ref} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
-import {Document, Back, Delete, Download} from '@element-plus/icons-vue';
+import {Document, Back, Delete, Download, ChatRound} from '@element-plus/icons-vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
 import lang from '../i18n/i18n';
 import {emailService} from "@/services/emailService";
@@ -113,9 +118,42 @@ const getInitial = (name: string) => {
   return name.charAt(0).toUpperCase();
 }
 
+/** 回信：跳转到发信页并自动填写发件人（原收件人）与收件人（原发件人）。新增日期: 20260516 */
+const handleReply = () => {
+  /** 收件人 = 原邮件的发件人地址 */
+  const replyTo = detailData.value.from_address || ''
+  /** 主题 = Re: + 原主题 */
+  const replySubject = detailData.value.subject
+    ? (detailData.value.subject.startsWith('Re: ') ? detailData.value.subject : 'Re: ' + detailData.value.subject)
+    : ''
+
+  /** 发件人 = 原邮件的第一个收件人地址（即收到该邮件的账号） */
+  let replySender = ''
+  let replyDomain = ''
+  if (tos.value && tos.value.length > 0) {
+    const firstToEmail = tos.value[0].EmailAddress || ''
+    const parts = firstToEmail.split('@')
+    if (parts.length === 2) {
+      replySender = parts[0]
+      replyDomain = parts[1]
+    }
+  }
+
+  router.push({
+    name: 'editer',
+    query: {
+      reply_to: replyTo,
+      reply_subject: replySubject,
+      reply_sender: replySender,
+      reply_domain: replyDomain,
+    }
+  })
+}
+
 const handleDelete = () => {
-  const id = detailData.value.id || parseInt(Array.isArray(route.params.id) ? route.params.id[0] : route.params.id);
-  if (!id) return;
+  // 修改日期: 20260516 — 使用 ue_id（user_email 表主键）精确匹配记录，与 ListView 删除逻辑保持一致
+  const ueId = detailData.value.ue_id;
+  if (!ueId) return;
 
   /** 通过 isTrashGroup 判断当前分组是否为垃圾箱（status === 3） */
   const forcedDel = isTrashGroup(groupStore.tag);
@@ -125,8 +163,8 @@ const handleDelete = () => {
     cancelButtonText: 'Cancel',
     type: 'warning',
   }).then(() => {
-    /** 通过 emailService 删除邮件 */
-    emailService.deleteEmails({ids: [id], forcedDel}).then((res: any) => {
+    /** 通过 emailService 删除邮件，使用 ue_ids 精确匹配 user_email 记录 */
+    emailService.deleteEmails({ids: [], forcedDel, ue_ids: [ueId]}).then((res: any) => {
       if (res.errorNo === 0) {
         ElMessage.success('Deleted successfully');
         router.push({name: 'list'});

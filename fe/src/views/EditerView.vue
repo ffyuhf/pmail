@@ -205,7 +205,7 @@ import {Close, Paperclip, Position, ArrowDown, Document, ArrowLeft, Upload, Circ
 import lang from '../i18n/i18n';
 import {Editor, Toolbar} from '@wangeditor/editor-for-vue'
 import {i18nChangeLanguage} from '@wangeditor/editor'
-import {useRouter} from 'vue-router';
+import {useRoute, useRouter} from 'vue-router';
 import {emailService} from "@/services/emailService";
 import useGroupStore from '../stores/group'
 import {useGlobalStatusStore} from "@/stores/useGlobalStatusStore";
@@ -214,6 +214,7 @@ import {parseCsv, readCsvFile} from "@/utils/csvParser";
 import type {CsvRecipient} from "@/utils/csvParser";
 
 const router = useRouter();
+const route = useRoute();
 const groupStore = useGroupStore()
 const globalStatus = useGlobalStatusStore();
 const showCcBcc = ref(false);
@@ -268,15 +269,49 @@ const init = function () {
         ruleForm.domains = globalStatus.userInfos.domains
         ruleForm.pickDomain = globalStatus.userInfos.domains[0]
         ruleForm.nickName = globalStatus.userInfos.name
+        /** 回信预填：init 异步回调后填充回信参数。新增日期: 20260516 */
+        fillReplyParams()
       })
     }else{
       ruleForm.sender = globalStatus.userInfos.account
-      ruleForm.domains = globalStatus.userInfos.domains
-      ruleForm.pickDomain = globalStatus.userInfos.domains[0]
-      ruleForm.nickName = globalStatus.userInfos.name
+        ruleForm.domains = globalStatus.userInfos.domains
+        ruleForm.pickDomain = globalStatus.userInfos.domains[0]
+        ruleForm.nickName = globalStatus.userInfos.name
+      /** 回信预填：同步初始化后填充回信参数。新增日期: 20260516 */
+      fillReplyParams()
     }
 }
 init()
+
+/**
+ * 回信参数预填：从 route.query 读取回信参数，自动填充收件人、主题、发件人。
+ * 仅在存在 reply_to 参数时执行（即从邮件详情页点击回信跳转而来）。
+ * 新增日期: 20260516
+ */
+const fillReplyParams = function () {
+  const replyTo = route.query.reply_to as string
+  const replySubject = route.query.reply_subject as string
+  const replySender = route.query.reply_sender as string
+  const replyDomain = route.query.reply_domain as string
+
+  if (!replyTo) return
+
+  /** 收件人 = 原邮件的发件人地址 */
+  ruleForm.receivers = [replyTo]
+
+  /** 主题 = Re: + 原主题 */
+  if (replySubject) {
+    ruleForm.subject = replySubject
+  }
+
+  /** 发件人 = 原邮件的收件人地址（即收到该邮件的账号），需验证域名在用户允许列表中 */
+  if (replySender && replyDomain) {
+    if (ruleForm.domains.includes(replyDomain)) {
+      ruleForm.sender = replySender
+      ruleForm.pickDomain = replyDomain
+    }
+  }
+}
 
 /** 发件人验证：前缀不能为空且不能包含 @ */
 const validateSender = function (rule: any, value: any, callback: any) {

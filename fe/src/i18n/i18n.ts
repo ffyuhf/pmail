@@ -141,7 +141,8 @@ let lang = {
     "csv_selected_count": "{count} selected",
     "csv_name_col": "Name",
     "csv_email_col": "Email",
-    "csv_confirm_import": "Confirm Import"
+    "csv_confirm_import": "Confirm Import",
+    "reply_email": "Reply"
 };
 
 
@@ -288,7 +289,8 @@ const zhCN = {
     "csv_selected_count": "已选 {count} 项",
     "csv_name_col": "姓名",
     "csv_email_col": "邮箱",
-    "csv_confirm_import": "确认导入"
+    "csv_confirm_import": "确认导入",
+    "reply_email": "回信"
 }
 
 const browserLang = (navigator.languages && navigator.languages[0]) || navigator.language || "en";

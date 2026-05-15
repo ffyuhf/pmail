@@ -56,6 +56,10 @@ export interface EmailAttachment {
 /** 邮件详情 */
 export interface EmailDetail {
   id: number;
+  /** user_email 表主键 ID，用于精确操作（删除/移动）。新增日期: 20260516 */
+  ue_id: number;
+  /** 邮件类型：0=接收, 1=发送。新增日期: 20260516 — 回信功能需区分收发邮件 */
+  type: number;
   subject: string;
   from_name: string;
   from_address: string;
