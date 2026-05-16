@@ -55,9 +55,8 @@ const isFullBleed = computed(() => !showHeader.value || pageName.value === 'edit
       <!-- 主内容区：login/setup/editer 页去除内边距 -->
       <div id="body" :class="{ 'full-bleed': isFullBleed }">
         <RouterView v-slot="{ Component }">
-          <transition name="page-fade" mode="out-in">
-            <component :is="Component" :key="route.fullPath" />
-          </transition>
+          <!-- 修改日期: 20260516 — 临时移除 transition 排查空屏问题 -->
+          <component :is="Component" :key="route.fullPath" />
         </RouterView>
       </div>
     </div>
