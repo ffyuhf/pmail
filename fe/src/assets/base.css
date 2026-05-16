@@ -343,6 +343,12 @@ a:hover {
   transition: opacity var(--ifm-transition-slow);
 }
 
+/* 修改日期: 20260516 — 离开组件绝对定位，脱离文档流，为新组件让出空间（cross-fade 模式） */
+.page-fade-leave-active {
+  position: absolute;
+  inset: 0;
+}
+
 .page-fade-enter-from,
 .page-fade-leave-to {
   opacity: 0;
