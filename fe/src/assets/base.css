@@ -338,18 +338,18 @@ a:hover {
 }
 
 /* ---------- 页面过渡动画 ---------- */
-.page-fade-enter-active,
+/* 修改日期: 20260516 — 进入动画改用 transform 微位移，保持 opacity:1 避免组件不可见时初始化失败（如 WangEditor） */
+.page-fade-enter-active {
+  transition: transform var(--ifm-transition-slow) ease-out;
+}
 .page-fade-leave-active {
   transition: opacity var(--ifm-transition-slow);
 }
 
-/* 修改日期: 20260516 — 离开组件绝对定位，脱离文档流，为新组件让出空间（cross-fade 模式） */
-.page-fade-leave-active {
-  position: absolute;
-  inset: 0;
+.page-fade-enter-from {
+  opacity: 1;
+  transform: translateY(4px);
 }
-
-.page-fade-enter-from,
 .page-fade-leave-to {
   opacity: 0;
 }

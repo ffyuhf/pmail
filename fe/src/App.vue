@@ -55,8 +55,7 @@ const isFullBleed = computed(() => !showHeader.value || pageName.value === 'edit
       <!-- 主内容区：login/setup/editer 页去除内边距 -->
       <div id="body" :class="{ 'full-bleed': isFullBleed }">
         <RouterView v-slot="{ Component }">
-          <!-- 修改日期: 20260516 — 移除 mode="out-in"，改为交叉淡入淡出（cross-fade），避免 EditerView 在 opacity:0 状态下挂载导致 WangEditor 初始化失败 -->
-          <transition name="page-fade">
+          <transition name="page-fade" mode="out-in">
             <component :is="Component" :key="route.fullPath" />
           </transition>
         </RouterView>
@@ -85,9 +84,7 @@ const isFullBleed = computed(() => !showHeader.value || pageName.value === 'edit
 }
 
 /* 主内容区：减小 padding 避免与视图容器双重内边距 */
-/* 修改日期: 20260516 — 添加 position: relative 作为离开组件绝对定位的参考容器 */
 #body {
-  position: relative;
   width: 100%;
   height: 100%;
   padding: var(--ifm-spacing-sm);
