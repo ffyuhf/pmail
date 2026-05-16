@@ -119,9 +119,9 @@ const getInitial = (name: string) => {
 }
 
 /**
- * 回信：跳转到发信页并自动填写发件人（原收件人）与收件人（原发件人）。
- * 使用 window.location.href 整页加载，避免 SPA 路由切换时 wangeditor 在 transition 动画中初始化失败导致空白。
- * 修改日期: 20260516 v1.2
+ * 回信：通过 SPA 路由跳转到发信页，自动填写发件人（原收件人）与收件人（原发件人）。
+ * 修改日期: 20260516 v1.2 — 使用 window.location.href 整页加载规避 WangEditor 空白
+ * 修改日期: 20260516 v1.4 — 恢复为 router.push SPA 路由跳转，根因已修复（EditerView 中 fillReplyParams 声明顺序问题）
  */
 const handleReply = () => {
   /** 收件人 = 原邮件的发件人地址 */
@@ -143,11 +143,6 @@ const handleReply = () => {
     }
   }
 
-  /**
-   * 先通过 SPA 路由跳转（确保 URL 和 query 参数正确更新），再强制整页刷新。
-   * 刷新后页面以全新状态加载，wangeditor 直接在可见状态下初始化，彻底避免 transition 空白问题。
-   * 修改日期: 20260516 v1.3
-   */
   router.push({
     name: 'editer',
     query: {
@@ -156,8 +151,6 @@ const handleReply = () => {
       reply_sender: replySender,
       reply_domain: replyDomain,
     }
-  }).then(() => {
-    location.reload()
   })
 }
 
