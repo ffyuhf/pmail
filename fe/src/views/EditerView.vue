@@ -262,31 +262,11 @@ const ruleForm = reactive<{
 })
 const fileList = reactive<{name: string; data: string | ArrayBuffer | null}[]>([]);
 
-const init = function () {
-    if ( Object.keys(globalStatus.userInfos).length===0 || globalStatus.userInfos === null || globalStatus.userInfos == undefined ){
-      globalStatus.init(()=>{
-        ruleForm.sender = globalStatus.userInfos.account
-        ruleForm.domains = globalStatus.userInfos.domains
-        ruleForm.pickDomain = globalStatus.userInfos.domains[0]
-        ruleForm.nickName = globalStatus.userInfos.name
-        /** 回信预填：init 异步回调后填充回信参数。新增日期: 20260516 */
-        fillReplyParams()
-      })
-    }else{
-      ruleForm.sender = globalStatus.userInfos.account
-        ruleForm.domains = globalStatus.userInfos.domains
-        ruleForm.pickDomain = globalStatus.userInfos.domains[0]
-        ruleForm.nickName = globalStatus.userInfos.name
-      /** 回信预填：同步初始化后填充回信参数。新增日期: 20260516 */
-      fillReplyParams()
-    }
-}
-init()
-
 /**
  * 回信参数预填：从 route.query 读取回信参数，自动填充收件人、主题、发件人。
  * 仅在存在 reply_to 参数时执行（即从邮件详情页点击回信跳转而来）。
  * 新增日期: 20260516
+ * 修改日期: 20260516 — 移至 init() 调用之前，避免 const 变量在声明前被访问导致 ReferenceError
  */
 const fillReplyParams = function () {
   const replyTo = route.query.reply_to as string
@@ -312,6 +292,27 @@ const fillReplyParams = function () {
     }
   }
 }
+
+const init = function () {
+    if ( Object.keys(globalStatus.userInfos).length===0 || globalStatus.userInfos === null || globalStatus.userInfos == undefined ){
+      globalStatus.init(()=>{
+        ruleForm.sender = globalStatus.userInfos.account
+        ruleForm.domains = globalStatus.userInfos.domains
+        ruleForm.pickDomain = globalStatus.userInfos.domains[0]
+        ruleForm.nickName = globalStatus.userInfos.name
+        /** 回信预填：init 异步回调后填充回信参数。新增日期: 20260516 */
+        fillReplyParams()
+      })
+    }else{
+      ruleForm.sender = globalStatus.userInfos.account
+        ruleForm.domains = globalStatus.userInfos.domains
+        ruleForm.pickDomain = globalStatus.userInfos.domains[0]
+        ruleForm.nickName = globalStatus.userInfos.name
+      /** 回信预填：同步初始化后填充回信参数。新增日期: 20260516 */
+      fillReplyParams()
+    }
+}
+init()
 
 /** 发件人验证：前缀不能为空且不能包含 @ */
 const validateSender = function (rule: any, value: any, callback: any) {
