@@ -198,14 +198,21 @@ IMAP端口： 993(SSL)
 
 ## ⚠️ 不兼容变更「对于原版」
 
-- **API Token 格式变更**：旧格式 `{account}:md5(hash+timestamp):timestamp` 已不支持，需通过 `/api/token/generate` 重新生成（Web 端 Session 不受影响）
-- **数据库 Schema 变更**：`user` 表 `password` 字段扩展为 `varchar(72)`，新增 `api_tokens` 表（自动迁移，无需手动操作）
-- **Setup 访问方式变更**：必须通过启动日志中带 `#/setup?token=xxx` 的 URL 访问配置页面
-- **DKIM 密钥升级**：从 1024 位升级为 2048 位，首次启动自动重新生成，**需更新 DNS TXT 记录**
-- **密码存储升级**：从 MD5 升级为 bcrypt，用户登录时自动迁移
-- **Session Cookie** 自动添加 SameSite=Lax
-- 首次部署时 Setup URL 携带一次性 Token，从启动日志获取（格式为 `http://IP/#/setup?token=xxx`）
-- 用户登录时自动从 MD5 升级为 bcrypt(12)；已有 bcrypt(cost=10) 哈希在下次登录成功后自动升级为 bcrypt(12)
+**必须手动操作：**
+
+| 操作 | 说明 |
+|------|------|
+| 更新 DNS DKIM 记录 | DKIM 密钥已从 1024 位升级为 2048 位，首次启动自动重新生成，需将新公钥更新到 DNS TXT 记录 |
+| 重新生成 API Token | 旧格式 `{account}:md5(hash+timestamp):timestamp` 已失效，需通过 `/api/token/generate` 重新生成（Web 端 Session 不受影响） |
+| 通过 Setup Token 初始化 | 必须从启动日志获取带 `#/setup?token=xxx` 的 URL 访问配置页面，直接访问 `http://IP` 将被拒绝 |
+
+**自动处理（无需手动操作）：**
+
+| 项目 | 说明 |
+|------|------|
+| 密码迁移 | 用户登录时自动从 MD5 升级为 bcrypt(12)；已有 bcrypt(cost=10) 自动升级为 bcrypt(12) |
+| 数据库表结构 | `user` 表 `password` 字段自动扩展为 `varchar(72)`，自动创建 `api_tokens` 表 |
+| Session Cookie | 自动添加 SameSite=Lax |
 
 ---
 
