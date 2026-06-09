@@ -28,37 +28,24 @@ jinnrry作者更的太慢了，功能对我来说太少了
 
 > ###### 正确配置包括但不限于：一个正常的顶级域名后戳，一个有固定的IP地址（支持rDNS）的服务器
 
-**认证与密码安全：**
-
-- 密码采用 bcrypt （12）安全哈希存储，替代传统弱哈希算法，支持渐进式自动迁移（含低轮数如 cost=10 的自动升级）
-- 全协议暴力破解防护（HTTP/SMTP/IMAP/POP3），基于IP和账户的指数退避频率限制
-- API Token 采用随机不透明令牌（Opaque Token），支持撤销和客户端IP绑定
-
-**传输与通信安全：**
-- SMTP 465/587 端口强制 TLS 认证，拒绝不安全连接，符合 RFC 6409 规范
-- 自动 SSL 证书：实现 ACME 协议，程序将自动获取并更新 Let's Encrypt 证书
-- HTTP 安全响应头（X-Content-Type-Options、X-Frame-Options、Strict-Transport-Security、X-XSS-Protection）
-
-**Web 应用安全：**
-- CSRF 防护：SameSite Cookie + Origin/Referer 双层校验
-- IDOR 越权访问防护：邮件详情查询强制验证用户归属关系
-- Setup 初始化接口安全加固：Token 验证、DSN 脱敏、路径遍历防护、HTTP 方法限制
-
-**数据与文件安全：**
-- DKIM 使用 2048 位 RSA 密钥签名，满足现代安全标准
-- 配置文件、SSL 私钥、DKIM 密钥等敏感文件采用最小权限（0600/0400/0644）
+- 密码采用 bcrypt 安全哈希存储，支持渐进式自动迁移
+- 全协议暴力破解防护（HTTP/SMTP/IMAP/POP3）
+- API Token 支持撤销和客户端 IP 绑定
+- SMTP 465/587 端口强制 TLS 认证
+- 自动 SSL 证书（ACME 协议，Let's Encrypt）
+- DKIM 使用 2048 位 RSA 密钥签名
+- CSRF 防护 + IDOR 越权访问防护
+- Setup 初始化接口安全加固
 
 ### 4、HTML 邮件兼容性
 
-修复 `multipart/related` 双重遍历 Bug，HTML 邮件不再显示为纯文本。扩展 XSS 安全策略，支持 HTML5 语义元素（section/article/header 等），同时仍阻止 script/iframe/object 等危险标签。修复大 HTML 邮件因 SMTP 超时被中断的问题（超时从 10s 增加到 60s），转发邮件自动添加正确的编码头。修复邮件标题和发件人名称中 HTML 实体编码（如 `&#39;`）显示异常的问题。
+完整支持 HTML 邮件渲染，XSS 安全策略兼顾安全与兼容性，支持 HTML5 语义元素同时阻止危险标签。编码兼容性良好，正确处理邮件标题和发件人名称中的特殊字符。
 
 ### 5、前端体验
 
-- 邮件搜索：侧边栏搜索框支持关键词搜索，回车触发、一键清空
-- 批量操作：列表全选/取消全选（含半选状态）、每页条数选择器（15/25/50/100）
-- 编辑器全屏：全屏模式覆盖整个写信界面（收件人、主题、附件等），而非仅编辑区
-- 视觉统一：采用 Docusaurus BEM 风格 CSS 变量体系，暗色模式下颜色一致
-- 布局自适应：列表行宽度按屏幕自适应，窄屏自动隐藏摘要列
+- 邮件关键词搜索、批量操作、每页条数选择
+- 编辑器全屏模式
+- 暗色模式、布局自适应
 
 ### 6、自动SSL证书
 
@@ -211,50 +198,14 @@ IMAP端口： 993(SSL)
 
 ## ⚠️ 不兼容变更「对于原版」
 
-### 1. API Token 格式变更
-
-- **旧格式**：`{account}:md5(hash+timestamp):timestamp` — 已不再支持
-- **新格式**：64 字符随机 hex 字符串
-- **迁移方式**：通过 `/api/token/generate` 端点重新生成
-- **影响范围**：仅影响通过 HTTP `Token` Header 调用 API 的外部集成，Web 端 Session 不受影响
-
-### 2. 数据库 Schema 变更
-
-- `user` 表 `password` 字段：`char(32)` → `varchar(72)`（xorm Sync2 自动迁移）
-- 新增 `api_tokens` 表（xorm Sync2 自动创建）
-
-### 3. Setup 访问方式变更
-
-- Setup 页面必须通过启动日志中带 `#/setup?token=xxx` 参数的 URL 访问（新格式，兼容 Vue Router hash 模式）
-- 旧格式 `?token=xxx` 仍然兼容，前端会自动从 `window.location.search` 读取
-- Setup 接口仅接受 POST 请求
-
-## 升级注意事项
-
-### 必须操作
-
-| 操作 | 说明 |
-|------|------|
-| **更新 DNS DKIM 记录** | DKIM 密钥已从 1024 位升级为 2048 位，首次启动自动重新生成，需将新公钥更新到 DNS TXT 记录 |
-| **重新生成 API Token** | 旧格式 Token 已失效，需通过 `/api/token/generate` 重新生成 |
-| **记录 Setup Token** | 首次部署时 Setup URL 携带一次性 Token，从启动日志获取（格式为 `http://IP/#/setup?token=xxx`） |
-
-### 自动处理（无需手动操作）
-
-| 项目 | 说明 |
-|------|------|
-| 密码迁移 | 用户登录时自动从 MD5 升级为 bcrypt(12)；已有 bcrypt(cost=10) 哈希在下次登录成功后自动升级为 bcrypt(12) |
-| 数据库表结构 | xorm Sync2 自动处理字段类型变更和新表创建 |
-| Cookie 属性 | Session Cookie 自动添加 SameSite=Lax |
-| 日志路径缩短 | 日志中的文件路径已从绝对路径缩短为项目相对路径（如 `pmail/server/...`），无需操作，如有外部日志解析工具需注意适配 |
-
-### 建议操作
-
-| 操作 | 说明 |
-|------|------|
-| 手动修复文件权限 | 对已有配置文件执行 `chmod 600`、SSL 私钥执行 `chmod 400` |
-| 验证邮件客户端 | 确认使用的邮件客户端支持 STARTTLS（现代客户端均支持） |
-
+- **API Token 格式变更**：旧格式 `{account}:md5(hash+timestamp):timestamp` 已不支持，需通过 `/api/token/generate` 重新生成（Web 端 Session 不受影响）
+- **数据库 Schema 变更**：`user` 表 `password` 字段扩展为 `varchar(72)`，新增 `api_tokens` 表（自动迁移，无需手动操作）
+- **Setup 访问方式变更**：必须通过启动日志中带 `#/setup?token=xxx` 的 URL 访问配置页面
+- **DKIM 密钥升级**：从 1024 位升级为 2048 位，首次启动自动重新生成，**需更新 DNS TXT 记录**
+- **密码存储升级**：从 MD5 升级为 bcrypt，用户登录时自动迁移
+- **Session Cookie** 自动添加 SameSite=Lax
+- 首次部署时 Setup URL 携带一次性 Token，从启动日志获取（格式为 `http://IP/#/setup?token=xxx`）
+- 用户登录时自动从 MD5 升级为 bcrypt(12)；已有 bcrypt(cost=10) 哈希在下次登录成功后自动升级为 bcrypt(12)
 
 ---
 
