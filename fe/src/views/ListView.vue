@@ -112,6 +112,7 @@
         background
         layout="prev, pager, next"
         :page-count="totalPage"
+        v-model:current-page="currentPage"
         @current-change="pageChange"
       />
     </div>
@@ -122,7 +123,7 @@
 import {EpArrowDownBold} from "vue-icons-plus/ep";
 import {Delete, View, Folder, EditPen, Warning} from "@element-plus/icons-vue";
 import {useRouter} from 'vue-router'
-import {ref, watch, computed} from 'vue'
+import {ref, watch, computed, nextTick} from 'vue'
 import useGroupStore from '../stores/group'
 import lang from '../i18n/i18n';
 import {emailService} from "@/services/emailService";
@@ -156,6 +157,9 @@ const totalPage = ref(0)
 /** 每页显示条数：用户可通过下拉选择器自定义（默认 15） */
 const pageSize = ref(15)
 
+/** 当前页码：与 el-pagination 双向绑定，切换每页条数时重置为 1 */
+const currentPage = ref(1)
+
 /** 当前选中行列表（由 el-table 的 selection-change 事件维护） */
 const selectedRows = ref<EmailListItem[]>([])
 
@@ -172,11 +176,15 @@ const isIndeterminate = computed(() => {
   return selectedRows.value.length > 0 && selectedRows.value.length < data.value.length
 })
 
-/** 刷新邮件列表：通过 emailService 获取数据，使用当前 pageSize */
+/** 刷新邮件列表：通过 emailService 获取数据，使用当前 pageSize 和 currentPage */
 const updateList = function () {
-  emailService.getEmailList({tag: tag, page_size: pageSize.value, keyword: groupStore.keyword}).then((res: any) => {
+  emailService.getEmailList({tag: tag, page_size: pageSize.value, current_page: currentPage.value, keyword: groupStore.keyword}).then((res: any) => {
     data.value = res.data.list || []
     totalPage.value = res.data.total_page || 0
+    /* 数据更新后重新布局 el-table，确保行高和滚动条正确计算 */
+    nextTick(() => {
+      taskTableDataRef.value?.doLayout()
+    })
   })
 }
 
@@ -313,15 +321,15 @@ const rowStyle = function () {
   return {'cursor': 'pointer'}
 }
 
-/** 翻页：通过 emailService 获取指定页数据，使用当前 pageSize */
+/** 翻页：通过 emailService 获取指定页数据，同步 currentPage 后刷新列表 */
 const pageChange = function (p: number) {
-  emailService.getEmailList({tag: tag, page_size: pageSize.value, current_page: p, keyword: groupStore.keyword}).then((res: any) => {
-    data.value = res.data.list || []
-  })
+  currentPage.value = p
+  updateList()
 }
 
 /** 每页条数变更：重置到第 1 页并刷新列表 */
 const handlePageSizeChange = function () {
+  currentPage.value = 1
   updateList()
 }
 </script>
@@ -389,7 +397,7 @@ const handlePageSizeChange = function () {
   flex-grow: 1;
   border-radius: var(--ifm-global-radius);
   border: 1px solid var(--ifm-border-color);
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .mail-list__table {
