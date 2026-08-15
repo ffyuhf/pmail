@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ffyuhf/pmail/consts"
 	"github.com/ffyuhf/pmail/db"
 	"github.com/ffyuhf/pmail/dto"
 	"github.com/ffyuhf/pmail/dto/response"
@@ -49,9 +50,23 @@ func genSQL(ctx *context.Context, count bool, tagInfo dto.SearchTag, keyword str
 		sql += `e.*,ue.is_read,ue.id as ue_id from email e left join user_email ue on e.id=ue.email_id where ue.user_id = ? `
 	}
 
+	// 移植日期: 20260815 — 系统文件夹（已删除/草稿/垃圾）查询改为 status 或 group_id 双条件命中，
+	// 与 doMove/Move2DefaultBox 写入系统文件夹语义配套（母项目改进合并移植，保留现有其余行为）
 	if tagInfo.Status != -1 {
-		sql += " and ue.status =? "
-		sqlParams = append(sqlParams, tagInfo.Status)
+		switch tagInfo.Status {
+		case consts.EmailStatusDel:
+			sql += " and (ue.status =? or ue.group_id=?) "
+			sqlParams = append(sqlParams, tagInfo.Status, models.Deleted)
+		case consts.EmailStatusDrafts:
+			sql += " and (ue.status =? or ue.group_id=?) "
+			sqlParams = append(sqlParams, tagInfo.Status, models.Drafts)
+		case consts.EmailStatusJunk:
+			sql += " and (ue.status =? or ue.group_id=?) "
+			sqlParams = append(sqlParams, tagInfo.Status, models.Junk)
+		default:
+			sql += " and ue.status =? "
+			sqlParams = append(sqlParams, tagInfo.Status)
+		}
 	} else if tagInfo.Status == -1 {
 		// 修复日期: 20260516 — 条件从 != -1 改为 > 0，避免 GroupId=0 的内置视图（收件箱/发件箱）跳过 status 过滤
 		// 根因：收件箱 Tag 的 GroupId=0，原条件 0!=-1 为 true 导致跳过 status 过滤，软删除后邮件仍显示在原文件夹
@@ -65,16 +80,30 @@ func genSQL(ctx *context.Context, count bool, tagInfo dto.SearchTag, keyword str
 		}
 	}
 
+	// 移植日期: 20260815 — 发件箱查询改为 type 或 Sent 系统文件夹 group_id 双条件命中（母项目改进合并移植）
 	if tagInfo.Type != -1 {
-		sql += " and type =? "
-		sqlParams = append(sqlParams, tagInfo.Type)
+		if tagInfo.Type == consts.EmailTypeSend {
+			sql += " and (type =? or ue.group_id=?)"
+			sqlParams = append(sqlParams, tagInfo.Type, models.Sent)
+		} else {
+			sql += " and type =? "
+			sqlParams = append(sqlParams, tagInfo.Type)
+		}
 	}
 
+	// 移植日期: 20260815 — GroupId 过滤适配系统文件夹：收件箱视图命中 group_id=0 或 INBOX，
+	// 全部邮件视图（GroupId 不限）命中默认文件夹或 INBOX（母项目改进合并移植）
 	if tagInfo.GroupId != -1 {
-		sql += " and ue.group_id=? "
-		sqlParams = append(sqlParams, tagInfo.GroupId)
+		if tagInfo.GroupId > 0 {
+			sql += " and ue.group_id=? "
+			sqlParams = append(sqlParams, tagInfo.GroupId)
+		} else if tagInfo.GroupId == 0 && tagInfo.Status == -1 {
+			sql += " and (ue.group_id=? or ue.group_id=0)"
+			sqlParams = append(sqlParams, models.INBOX)
+		}
 	} else {
-		sql += " and ue.group_id=0 "
+		sql += " and (ue.group_id=0 or ue.group_id =?) "
+		sqlParams = append(sqlParams, models.INBOX)
 	}
 
 	// 修改日期: 20260610 — #15 修复搜索关键词 SQL LIKE 通配符注入

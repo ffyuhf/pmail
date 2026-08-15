@@ -29,7 +29,17 @@ func Stop() {
 
 // StarTLS 启动TLS端口监听，不加密的代码就懒得写了
 func StarTLS() {
+	instanceTLS = newIMAPServer()
+	pmailLog.ImapInfof(nil, pmailLog.EventIMAPSessionNew, "IMAP服务启动 端口=993 模式=TLS")
+	if err := instanceTLS.ListenAndServeTLS(":993"); err != nil {
+		panic(err)
+	}
+}
 
+// newIMAPServer 构造 IMAP 服务器实例（证书加载、能力声明、会话工厂）。
+// 移植日期: 20260815 — 从 StarTLS 抽取为工厂函数（母项目改进移植），
+// 供生产启动与测试（随机端口监听）复用；保留现有能力声明与客户端 IP 提取逻辑。
+func newIMAPServer() *imapserver.Server {
 	crt, err := tls.LoadX509KeyPair(config.Instance.SSLPublicKeyPath, config.Instance.SSLPrivateKeyPath)
 	if err != nil {
 		panic(err)
@@ -71,9 +81,5 @@ func StarTLS() {
 		option.DebugWriter = os.Stdout
 	}
 
-	instanceTLS = imapserver.New(option)
-	pmailLog.ImapInfof(nil, pmailLog.EventIMAPSessionNew, "IMAP服务启动 端口=993 模式=TLS")
-	if err := instanceTLS.ListenAndServeTLS(":993"); err != nil {
-		panic(err)
-	}
+	return imapserver.New(option)
 }

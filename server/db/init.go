@@ -43,7 +43,8 @@ func Init(version string) error {
 	}
 
 	Instance.SetConnMaxLifetime(30 * time.Minute)
-	Instance.ShowSQL(false)
+	// 移植日期: 20260815 — 日志级别为 debug 时输出 SQL 语句，便于排查数据库问题（母项目改进移植）
+	Instance.ShowSQL(config.Instance.LogLevel == "debug")
 	// 同步表结构
 	syncTables()
 
