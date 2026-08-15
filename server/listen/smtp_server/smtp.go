@@ -1,0 +1,128 @@
+package smtp_server
+
+import (
+	"crypto/tls"
+	"time"
+
+	"github.com/emersion/go-smtp"
+	"github.com/ffyuhf/pmail/config"
+	pmailLog "github.com/ffyuhf/pmail/utils/log"
+	log "github.com/sirupsen/logrus"
+)
+
+var instance *smtp.Server
+var instanceTls *smtp.Server
+var instanceTlsNew *smtp.Server
+
+func StartWithTLSNew() {
+	be := &Backend{}
+
+	instanceTlsNew = smtp.NewServer(be)
+
+	instanceTlsNew.Addr = ":587"
+	instanceTlsNew.Domain = config.Instance.Domain
+	// 修复：将超时从10秒增加到60秒，避免大HTML邮件传输超时被中断
+	instanceTlsNew.ReadTimeout = 60 * time.Second
+	instanceTlsNew.WriteTimeout = 60 * time.Second
+	instanceTlsNew.MaxMessageBytes = 1024 * 1024 * 30
+	instanceTlsNew.MaxRecipients = 50
+	// 强制 TLS 认证：拒绝未加密连接上的认证
+	instanceTlsNew.AllowInsecureAuth = false
+	// P0-1 修复（RFC 6531）：启用 SMTPUTF8，支持国际化邮件地址提交
+	instanceTlsNew.EnableSMTPUTF8 = true
+	// 阶段二 P1（RFC 3461）：启用 DSN 投递状态通知，支持 NOTIFY/RET/ENVID/ORCPT 参数
+	instanceTlsNew.EnableDSN = true
+	// 加载证书和密钥
+	cer, err := tls.LoadX509KeyPair(config.Instance.SSLPublicKeyPath, config.Instance.SSLPrivateKeyPath)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	// 配置 STARTTLS 的 TLS 支持
+	instanceTlsNew.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cer}}
+
+	pmailLog.SmtpInfof(nil, "SERVER_START", "端口=587 模式=STARTTLS")
+	// 587端口使用STARTTLS（先明文连接，再升级TLS），而非隐式TLS
+	if err := instanceTlsNew.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func StartWithTLS() {
+	be := &Backend{}
+
+	instanceTls = smtp.NewServer(be)
+
+	instanceTls.Addr = ":465"
+	instanceTls.Domain = config.Instance.Domain
+	// 修复：将超时从10秒增加到60秒，避免大HTML邮件传输超时被中断
+	instanceTls.ReadTimeout = 60 * time.Second
+	instanceTls.WriteTimeout = 60 * time.Second
+	instanceTls.MaxMessageBytes = 1024 * 1024 * 30
+	instanceTls.MaxRecipients = 50
+	// 强制 TLS 认证：拒绝未加密连接上的认证
+	instanceTls.AllowInsecureAuth = false
+	// P0-1 修复（RFC 6531）：启用 SMTPUTF8，支持国际化邮件地址提交
+	instanceTls.EnableSMTPUTF8 = true
+	// 阶段二 P1（RFC 3461）：启用 DSN 投递状态通知，支持 NOTIFY/RET/ENVID/ORCPT 参数
+	instanceTls.EnableDSN = true
+	// 加载证书和密钥
+	cer, err := tls.LoadX509KeyPair(config.Instance.SSLPublicKeyPath, config.Instance.SSLPrivateKeyPath)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	// 配置 TLS 支持
+	instanceTls.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cer}}
+
+	pmailLog.SmtpInfof(nil, "SERVER_START", "端口=465 模式=SSL")
+	if err := instanceTls.ListenAndServeTLS(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func Start() {
+	be := &Backend{}
+
+	instance = smtp.NewServer(be)
+
+	instance.Addr = ":25"
+	instance.Domain = config.Instance.Domain
+	// 修复：将超时从10秒增加到60秒，避免大HTML邮件传输超时被中断
+	instance.ReadTimeout = 60 * time.Second
+	instance.WriteTimeout = 60 * time.Second
+	instance.MaxMessageBytes = 1024 * 1024 * 30
+	instance.MaxRecipients = 50
+	// 强制 TLS 认证
+	instance.AllowInsecureAuth = false
+	// P0-1 修复（RFC 6531）：启用 SMTPUTF8，支持国际化邮件地址传输
+	instance.EnableSMTPUTF8 = true
+	// 阶段二 P1（RFC 3461）：启用 DSN 投递状态通知，支持 NOTIFY/RET/ENVID/ORCPT 参数
+	instance.EnableDSN = true
+	// 加载证书和密钥
+	cer, err := tls.LoadX509KeyPair(config.Instance.SSLPublicKeyPath, config.Instance.SSLPrivateKeyPath)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	// 配置 TLS 支持
+	instance.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cer}}
+
+	pmailLog.SmtpInfof(nil, "SERVER_START", "端口=25 模式=明文")
+	if err := instance.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func Stop() {
+	if instance != nil {
+		instance.Close()
+	}
+	if instanceTls != nil {
+		instanceTls.Close()
+	}
+
+	if instanceTlsNew != nil {
+		instanceTlsNew.Close()
+	}
+}

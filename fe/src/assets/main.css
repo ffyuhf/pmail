@@ -1,0 +1,28 @@
+/* ============================================================
+ * PMail — 全局布局样式（Docusaurus 风格）
+ * 改造日期: 20250425
+ * ============================================================ */
+@import './base.css';
+
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  font-weight: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--ifm-color-content);
+  background-color: var(--ifm-background-surface-color);
+  overflow: hidden;
+}
+
+/* 移动端侧边栏抽屉 */
+.mobile-aside-drawer {
+  background: transparent;
+}
+
+.mobile-aside-drawer .el-drawer__body {
+  padding: 0 !important;
+  background: transparent;
+}

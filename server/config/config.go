@@ -1,0 +1,367 @@
+package config
+
+import (
+	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/pem"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+
+	"github.com/ffyuhf/pmail/utils/context"
+	"github.com/ffyuhf/pmail/utils/errors"
+	"github.com/ffyuhf/pmail/utils/file"
+	log "github.com/sirupsen/logrus"
+)
+
+var IsInit bool
+
+// SetupToken 是初始化阶段使用的临时鉴权 Token，服务启动时随机生成。
+// 所有 /api/setup 请求必须携带此 Token 才能执行，防止未授权访问。
+var SetupToken string
+
+// GenerateSetupToken 生成一个 32 字节的随机 hex 字符串作为 Setup Token。
+// 该 Token 在每次 Setup 服务启动时生成，初始化完成后随服务退出而失效。
+func GenerateSetupToken() string {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate setup token: %v", err))
+	}
+	SetupToken = hex.EncodeToString(b)
+	return SetupToken
+}
+
+type Config struct {
+	LogLevel             string            `json:"logLevel"` // 日志级别
+	Domain               string            `json:"domain"`
+	Domains              []string          `json:"domains"` //多域名设置，把所有收信域名都填进去
+	WebDomain            string            `json:"webDomain"`
+	DkimPrivateKeyPath   string            `json:"dkimPrivateKeyPath"`
+	SSLType              string            `json:"sslType"` // 0表示自动生成证书，HTTP挑战模式，1表示用户上传证书，2表示自动-DNS挑战模式
+	SSLPrivateKeyPath    string            `json:"SSLPrivateKeyPath"`
+	SSLPublicKeyPath     string            `json:"SSLPublicKeyPath"`
+	DbDSN                string            `json:"dbDSN"`
+	DbType               string            `json:"dbType"`
+	HttpsEnabled         int               `json:"httpsEnabled"`    //后台页面是否启用https，0默认（启用），1启用，2不启用
+	SpamFilterLevel      int               `json:"spamFilterLevel"` //垃圾邮件过滤级别，0不过滤、1 spf dkim 校验均失败时过滤，2 spf校验不通过时过滤 3,dkim 校验不过的时候过滤
+	HttpPort             int               `json:"httpPort"`        //http服务端口设置，默认80
+	HttpsPort            int               `json:"httpsPort"`       //https服务端口，默认443
+	WeChatPushAppId      string            `json:"weChatPushAppId"`
+	WeChatPushSecret     string            `json:"weChatPushSecret"`
+	WeChatPushTemplateId string            `json:"weChatPushTemplateId"`
+	WeChatPushUserId     string            `json:"weChatPushUserId"`
+	TgBotToken           string            `json:"tgBotToken"`
+	TgChatId             string            `json:"tgChatId"`
+	IsInit               bool              `json:"isInit"`
+	WebPushUrl           string            `json:"webPushUrl"`
+	WebPushToken         string            `json:"webPushToken"`
+	Tables               map[string]string `json:"-"`
+	TablesInitData       map[string]string `json:"-"`
+	setupPort            int               // 初始化阶段端口
+}
+
+var ROOT_PATH = ""
+
+func init() {
+	envs := os.Environ()
+	for _, env := range envs {
+		if strings.HasPrefix(env, "PMail_ROOT=") {
+			ROOT_PATH = strings.TrimSpace(strings.ReplaceAll(env, "PMail_ROOT=", ""))
+			if !strings.HasSuffix(ROOT_PATH, "/") {
+				ROOT_PATH += "/"
+			}
+
+			fmt.Println("Env Root Path:", ROOT_PATH)
+			return
+		}
+	}
+
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+	realPath, err := filepath.EvalSymlinks(exPath)
+	if err != nil {
+		panic(err)
+	}
+	// 如果是Goland运行，不修改根路径
+	if strings.Contains(realPath, "GoLand") && strings.Contains(realPath, "JetBrains") {
+		return
+	}
+
+	if !strings.HasSuffix(realPath, "/") {
+		realPath += "/"
+	}
+	ROOT_PATH = realPath
+	fmt.Println("Root Path:", ROOT_PATH)
+}
+
+func (c *Config) GetSetupPort() int {
+	return c.setupPort
+}
+
+func (c *Config) SetSetupPort(setupPort int) {
+	c.setupPort = setupPort
+}
+
+const DBTypeMySQL = "mysql"
+const DBTypeSQLite = "sqlite"
+const DBTypePostgres = "postgres"
+const SSLTypeAutoHTTP = "0" //自动生成证书
+const SSLTypeAutoDNS = "2"  //自动生成证书，DNS api验证
+const SSLTypeUser = "1"     //用户上传证书
+
+var DBTypes []string = []string{DBTypeMySQL, DBTypeSQLite, DBTypePostgres}
+
+var Instance *Config = &Config{}
+
+type logFormatter struct {
+}
+
+// Format 定义日志输出格式：[级别][时间][LogID][协议][文件:行号]消息
+// 协议字段从 context.Context 中读取，若无协议信息则省略该段。
+// 调用栈跳帧：跳过 logrus 内部和 utils/log/log.go 包装层，显示真实业务调用者。
+func (l *logFormatter) Format(entry *log.Entry) ([]byte, error) {
+	b := bytes.Buffer{}
+
+	// [级别]
+	b.WriteString(fmt.Sprintf("[%s]", entry.Level.String()))
+	// [时间]
+	b.WriteString(fmt.Sprintf("[%s]", entry.Time.Format("2006-01-02 15:04:05")))
+	// [LogID] 和 [协议] 从上下文中提取，无上下文时显示 [SYSTEM]
+	if entry.Context != nil {
+		ctx := entry.Context.(*context.Context)
+		if ctx != nil {
+			logID := fmt.Sprintf("%v", ctx.GetValue(context.LogID))
+			if logID == "" || logID == "<nil>" {
+				logID = "SYSTEM"
+			}
+			b.WriteString(fmt.Sprintf("[%s]", logID))
+			if ctx.Protocol != "" {
+				b.WriteString(fmt.Sprintf("[%s]", ctx.Protocol))
+			}
+		}
+	} else {
+		b.WriteString("[SYSTEM]")
+	}
+	// [文件:行号] — 跳过 log.go 包装层和 logrus 内部帧，显示真实调用者
+	b.WriteString(fmt.Sprintf("[%s]", getRealCaller()))
+	// 消息内容
+	b.WriteString(entry.Message)
+
+	b.WriteString("\n")
+	return b.Bytes(), nil
+}
+
+// shortenFilePath 将绝对文件路径缩短为项目相对路径，提升日志可读性。
+// 截取策略：查找路径中的 "/server/" 段，取其前一级目录名拼接后续路径。
+// 示例：/home/runner/work/pmail/pmail/server/listen/smtp_server/action.go
+//
+//	→ pmail/server/listen/smtp_server/action.go
+//
+// 若路径中不包含 "/server/"，则原样返回，确保不丢失信息。
+func shortenFilePath(fullPath string) string {
+	const marker = "/server/"
+	idx := strings.LastIndex(fullPath, marker)
+	if idx <= 0 {
+		// 未找到 "/server/" 标记，回退返回原始路径
+		return fullPath
+	}
+	// 取 "/server/" 前一级目录名：从 idx-1 向前查找上一个 "/"
+	dirEnd := idx // dirEnd 指向 "/server/" 的起始 '/'
+	dirStart := dirEnd
+	for dirStart > 0 && fullPath[dirStart-1] != '/' {
+		dirStart--
+	}
+	if dirStart >= dirEnd {
+		// 无法提取目录名，回退返回原始路径
+		return fullPath
+	}
+	// 拼接：目录名 + "/server/..."（去掉末尾的 "/server/" 前的 "/"）
+	return fullPath[dirStart:]
+}
+
+// getRealCaller 遍历调用栈，跳过 logrus 内部和 utils/log/log.go 包装函数，
+// 返回第一个真实业务代码的 "文件:行号"（路径已缩短）。未找到时返回 "?"。
+func getRealCaller() string {
+	pcs := make([]uintptr, 32)
+	n := runtime.Callers(2, pcs)
+	frames := runtime.CallersFrames(pcs[:n])
+
+	for {
+		frame, more := frames.Next()
+		if !more {
+			break
+		}
+		// 跳过 logrus 内部帧
+		if strings.Contains(frame.File, "sirupsen/logrus") {
+			continue
+		}
+		// 跳过我们的日志包装层
+		if strings.Contains(frame.File, "utils/log/log.go") {
+			continue
+		}
+		// 跳过 config.go 中的 Format/getRealCaller
+		if strings.Contains(frame.File, "config/config.go") {
+			continue
+		}
+		// 找到真实调用者，缩短路径后返回
+		return fmt.Sprintf("%s:%d", shortenFilePath(frame.File), frame.Line)
+	}
+	return "?"
+}
+func Init() {
+	var cfgData []byte
+	var err error
+	args := os.Args
+
+	if len(args) >= 2 && args[len(args)-1] == "dev" {
+		cfgData, err = os.ReadFile(ROOT_PATH + "./config/config.dev.json")
+		if err != nil {
+			return
+		}
+	} else {
+		cfgData, err = os.ReadFile(ROOT_PATH + "./config/config.json")
+		if err != nil {
+			log.Errorf("配置文件未找到: %s", err.Error())
+			return
+		}
+	}
+
+	err = json.Unmarshal(cfgData, &Instance)
+	Instance.fixPath()
+	if err != nil {
+		return
+	}
+
+	if len(Instance.Domains) == 0 && Instance.Domain != "" {
+		Instance.Domains = []string{Instance.Domain}
+	}
+
+	if Instance.Domain != "" && Instance.IsInit {
+		IsInit = true
+	}
+
+	// 设置日志格式为json格式
+	log.SetFormatter(&logFormatter{})
+	log.SetReportCaller(true)
+
+	// 设置将日志输出到标准输出（默认的输出为stderr,标准错误）
+	// 日志消息输出可以是任意的io.writer类型
+	log.SetOutput(os.Stdout)
+
+	var cstZone = time.FixedZone("CST", 8*3600)
+	time.Local = cstZone
+	if Instance != nil {
+		switch Instance.LogLevel {
+		case "":
+			log.SetLevel(log.InfoLevel)
+		case "debug":
+			log.SetLevel(log.DebugLevel)
+		case "info":
+			log.SetLevel(log.InfoLevel)
+		case "warn":
+			log.SetLevel(log.WarnLevel)
+		case "error":
+			log.SetLevel(log.ErrorLevel)
+		default:
+			log.SetLevel(log.InfoLevel)
+		}
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+
+}
+
+func ReadPrivateKey() (*ecdsa.PrivateKey, bool) {
+	key, err := os.ReadFile(ROOT_PATH + "./config/ssl/account_private.pem")
+	if err != nil {
+		return createNewPrivateKey(), true
+	}
+
+	block, _ := pem.Decode(key)
+	x509Encoded := block.Bytes
+	privateKey, _ := x509.ParseECPrivateKey(x509Encoded)
+
+	return privateKey, false
+}
+
+func createNewPrivateKey() *ecdsa.PrivateKey {
+	// 创建用户。新账户需要邮箱和私钥才能启动。
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	x509Encoded, _ := x509.MarshalECPrivateKey(privateKey)
+
+	// 将ec 密钥写入到 pem文件里
+	keypem, _ := os.OpenFile(ROOT_PATH+"./config/ssl/account_private.pem", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0400)
+	err = pem.Encode(keypem, &pem.Block{Type: "EC PRIVATE KEY", Bytes: x509Encoded})
+	if err != nil {
+		panic(err)
+	}
+	return privateKey
+}
+
+func WriteConfig(cfg *Config) error {
+	bytes, _ := json.Marshal(cfg)
+	_ = os.MkdirAll(ROOT_PATH+"/config/", 0700)
+	err := os.WriteFile(ROOT_PATH+"./config/config.json", bytes, 0600)
+	if err != nil {
+		return errors.Wrap(err)
+	}
+	return nil
+}
+
+func ReadConfig() (*Config, error) {
+	configData := Config{
+		DkimPrivateKeyPath: ROOT_PATH + "config/dkim/dkim.priv",
+		SSLPrivateKeyPath:  ROOT_PATH + "config/ssl/private.key",
+		SSLPublicKeyPath:   ROOT_PATH + "config/ssl/public.crt",
+	}
+	if !file.PathExist(ROOT_PATH + "./config/config.json") {
+		bytes, _ := json.Marshal(configData)
+		_ = os.MkdirAll(ROOT_PATH+"/config/", 0700)
+		err := os.WriteFile(ROOT_PATH+"./config/config.json", bytes, 0600)
+		if err != nil {
+			log.Errorf("写入配置失败: %s", err.Error())
+			return nil, errors.Wrap(err)
+		}
+	} else {
+		cfgData, err := os.ReadFile(ROOT_PATH + "./config/config.json")
+		if err != nil {
+			log.Errorf("读取配置失败: %s", err.Error())
+			return nil, errors.Wrap(err)
+		}
+
+		err = json.Unmarshal(cfgData, &configData)
+		configData.fixPath()
+		if err != nil {
+			log.Errorf("配置解析失败: %s", err.Error())
+			return nil, errors.Wrap(err)
+		}
+	}
+	return &configData, nil
+}
+
+func (c *Config) fixPath() {
+	if c.DbType == DBTypeSQLite && !strings.HasPrefix(c.DbDSN, "/") {
+		c.DbDSN = ROOT_PATH + c.DbDSN
+	}
+	if !strings.HasPrefix(c.SSLPublicKeyPath, "/") {
+		c.SSLPublicKeyPath = ROOT_PATH + c.SSLPublicKeyPath
+	}
+	if !strings.HasPrefix(c.SSLPrivateKeyPath, "/") {
+		c.SSLPrivateKeyPath = ROOT_PATH + c.SSLPrivateKeyPath
+	}
+}

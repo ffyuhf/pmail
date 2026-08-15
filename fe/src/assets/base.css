@@ -1,0 +1,366 @@
+/* ============================================================
+ * PMail — Docusaurus / Infima 风格 CSS 变量体系
+ * 改造日期: 20250425
+ * 改造原因: 原 glassmorphism 风格在部分浏览器渲染异常，
+ *           桌面端 Header 不可见，视觉层次混乱
+ * ============================================================ */
+
+/* ---------- Infima 字体栈 ---------- */
+:root {
+  --ifm-font-family-base: system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', 'Noto Sans', 'Liberation Sans', Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --ifm-font-family-monospace: 'SFMono-Regular', Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+}
+
+/* ---------- Light 模式（默认） ---------- */
+:root {
+  color-scheme: light;
+
+  /* 语义色 */
+  --ifm-color-primary: #25c2a0;
+  --ifm-color-primary-dark: #21a78c;
+  --ifm-color-primary-darker: #1e9a81;
+  --ifm-color-primary-light: #3dcdb0;
+  --ifm-color-primary-lighter: #50d4b9;
+
+  /* 背景 */
+  --ifm-background-color: #ffffff;
+  --ifm-background-surface-color: #f5f6f7;
+
+  /* 文字 */
+  --ifm-color-content: #1b1b1b;
+  --ifm-color-content-secondary: #525252;
+  --ifm-color-content-muted: #7a7a7a;
+
+  /* 边框 & 分隔 */
+  --ifm-border-color: #e5e7eb;
+  --ifm-hr-color: #ebedf0;
+  --ifm-color-emphasis-300: #ebedf0;
+
+  /* Navbar */
+  --ifm-navbar-background-color: #ffffff;
+  --ifm-navbar-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+
+  /* Sidebar */
+  --ifm-sidebar-background-color: #ffffff;
+
+  /* 圆角 */
+  --ifm-global-radius: 8px;
+  --ifm-button-border-radius: 8px;
+  --ifm-card-border-radius: 8px;
+
+  /* 阴影 */
+  --ifm-global-shadow-lw: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+  --ifm-global-shadow-md: 0 4px 12px 0 rgba(0, 0, 0, 0.08);
+  --ifm-global-shadow-tl: 0 4px 12px 0 rgba(0, 0, 0, 0.08);
+
+  /* 间距 */
+  --ifm-spacing-xs: 4px;
+  --ifm-spacing-sm: 8px;
+  --ifm-spacing-md: 16px;
+  --ifm-spacing-lg: 24px;
+  --ifm-spacing-xl: 32px;
+
+  /* 过渡 */
+  --ifm-transition-fast: 100ms;
+  --ifm-transition-slow: 250ms;
+
+  /* Navbar 高度 */
+  --ifm-navbar-height: 56px;
+  --ifm-sidebar-width: 260px;
+
+  /* Docusaurus 扩展变量：替代原有 --pm-* 映射 */
+  --ifm-background-hover-color: #f0f1f2;
+  --ifm-border-color-strong: #d1d5db;
+  --ifm-row-hover-background: #f0faf7;
+
+  /* Element Plus 主题覆盖 */
+  --el-color-primary: var(--ifm-color-primary);
+  --el-color-primary-light-3: #7ee0c9;
+  --el-color-primary-light-5: #a8ebd8;
+  --el-color-primary-light-7: #d1f5ea;
+  --el-color-primary-light-8: #e2f9f1;
+  --el-color-primary-light-9: #f0fcf8;
+  --el-border-radius-base: var(--ifm-global-radius);
+  --el-border-radius-small: 6px;
+  --el-text-color-primary: var(--ifm-color-content);
+  --el-text-color-regular: var(--ifm-color-content-secondary);
+  --el-text-color-secondary: var(--ifm-color-content-muted);
+  --el-bg-color: var(--ifm-background-color);
+  --el-bg-color-page: var(--ifm-background-surface-color);
+  --el-bg-color-overlay: var(--ifm-background-color);
+  --el-border-color: var(--ifm-border-color);
+  --el-border-color-light: #eceef1;
+  --el-fill-color-light: #f6f7f8;
+  --el-fill-color-lighter: #fafbfc;
+  --el-fill-color-dark: var(--ifm-background-hover-color);
+  --el-fill-color-darker: var(--ifm-background-hover-color);
+  --el-fill-color-blank: var(--ifm-background-color);
+  --el-box-shadow-light: var(--ifm-global-shadow-lw);
+  --el-mask-color: rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Dark 模式 ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --ifm-color-primary: #3dcea8;
+    --ifm-color-primary-dark: #33b892;
+    --ifm-color-primary-darker: #2faa87;
+    --ifm-color-primary-light: #5ad6b4;
+    --ifm-color-primary-lighter: #74debf;
+
+    --ifm-background-color: #1b1b1d;
+    --ifm-background-surface-color: #121212;
+
+    --ifm-color-content: #e3e3e5;
+    --ifm-color-content-secondary: #b3b3b3;
+    --ifm-color-content-muted: #8a8a8a;
+
+    --ifm-border-color: #2e2e2e;
+    --ifm-hr-color: #333;
+    --ifm-color-emphasis-300: #333;
+
+    --ifm-navbar-background-color: #1b1b1d;
+    --ifm-navbar-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+
+    --ifm-sidebar-background-color: #18181a;
+
+    --ifm-global-shadow-lw: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --ifm-global-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+    --ifm-global-shadow-tl: 0 4px 16px rgba(0, 0, 0, 0.35);
+
+    /* Docusaurus 扩展变量（dark 模式） */
+    --ifm-background-hover-color: #2a2a2c;
+    --ifm-border-color-strong: #444;
+    --ifm-row-hover-background: #1e2d28;
+
+    /* Element Plus dark overrides */
+    --el-border-color-light: #333;
+    --el-bg-color: #242526;
+    --el-bg-color-overlay: #2a2b2c;
+    --el-fill-color-light: #2e2f30;
+    --el-fill-color-lighter: #333435;
+  }
+
+  /* Element Plus 下拉菜单 dark 修正 */
+  .el-popper.is-light,
+  .el-select__popper.el-popper,
+  .el-select-dropdown {
+    background: var(--el-bg-color-overlay) !important;
+    border-color: var(--ifm-border-color) !important;
+    color: var(--ifm-color-content);
+  }
+
+  .el-popper.is-light .el-popper__arrow::before,
+  .el-select__popper.el-popper .el-popper__arrow::before {
+    background: var(--el-bg-color-overlay) !important;
+    border-color: var(--ifm-border-color) !important;
+  }
+
+  .el-select-dropdown__item {
+    color: var(--ifm-color-content-secondary);
+  }
+
+  .el-select-dropdown__item.hover,
+  .el-select-dropdown__item:hover {
+    background: var(--ifm-background-hover-color) !important;
+    color: var(--ifm-color-content);
+  }
+
+  .el-select-dropdown__item.selected {
+    color: var(--ifm-color-primary) !important;
+    font-weight: 600;
+  }
+}
+
+/* ---------- 全局重置 ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  height: 100vh;
+}
+
+body {
+  height: 100vh;
+  min-height: 100vh;
+  color: var(--ifm-color-content);
+  background: var(--ifm-background-surface-color);
+  line-height: 1.6;
+  font-family: var(--ifm-font-family-base);
+  font-size: 15px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--ifm-color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* ---------- Element Plus 全局覆盖 ---------- */
+
+/* 按钮 */
+.el-button {
+  font-weight: 500;
+  border-radius: var(--ifm-global-radius);
+  transition: background-color var(--ifm-transition-fast),
+    border-color var(--ifm-transition-fast),
+    color var(--ifm-transition-fast);
+}
+
+.el-button--default {
+  border-color: var(--ifm-border-color);
+  background: var(--ifm-background-color);
+}
+
+.el-button--default:hover {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+  background: var(--ifm-background-color);
+}
+
+.el-button--primary {
+  background-color: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+}
+
+.el-button--primary:hover {
+  background-color: var(--ifm-color-primary-dark);
+  border-color: var(--ifm-color-primary-dark);
+}
+
+/* plain primary 按钮：全局覆盖背景为实色绿后，文字需强制白色以保证可见性 */
+.el-button--primary.is-plain {
+  color: #fff;
+}
+
+/* 输入框 */
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select .el-input__wrapper {
+  border-radius: var(--ifm-global-radius);
+  box-shadow: 0 0 0 1px var(--ifm-border-color) inset !important;
+  background: var(--ifm-background-color);
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--ifm-color-primary) inset !important;
+}
+
+/* 下拉菜单 */
+.el-select-dropdown,
+.el-dropdown__popper.el-popper,
+.el-popper.is-light {
+  background: var(--ifm-background-color);
+  border-color: var(--ifm-border-color);
+  border-radius: var(--ifm-global-radius);
+}
+
+.el-select-dropdown__item {
+  color: var(--ifm-color-content-secondary);
+}
+
+.el-select-dropdown__item.hover,
+.el-select-dropdown__item:hover {
+  background: var(--ifm-background-hover-color);
+  color: var(--ifm-color-content);
+}
+
+.el-select-dropdown__item.selected {
+  color: var(--ifm-color-primary);
+}
+
+/* 表格 */
+.el-table {
+  --el-table-border-color: var(--ifm-color-emphasis-300);
+  --el-table-row-hover-bg-color: var(--ifm-row-hover-background);
+  --el-table-header-bg-color: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  background: transparent;
+  color: var(--ifm-color-content);
+}
+
+.el-table__inner-wrapper,
+.el-table__body,
+.el-table__header,
+.el-table__body-wrapper,
+.el-scrollbar__view {
+  background: transparent;
+}
+
+.el-table__inner-wrapper::before,
+.el-table::before,
+.el-table__border-left-patch {
+  background: transparent;
+}
+
+.el-table td.el-table__cell,
+.el-table th.el-table__cell {
+  border-bottom-color: var(--ifm-color-emphasis-300);
+  background: transparent;
+}
+
+/* 分页 */
+.el-pagination.is-background .btn-prev,
+.el-pagination.is-background .btn-next,
+.el-pagination.is-background .el-pager li {
+  background: var(--ifm-background-color);
+  border: 1px solid var(--ifm-border-color);
+  color: var(--ifm-color-content-secondary);
+  border-radius: var(--ifm-global-radius);
+}
+
+.el-pagination.is-background .el-pager li.is-active {
+  background: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+  color: #fff;
+}
+
+/* ---------- 页面过渡动画 ---------- */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity var(--ifm-transition-slow);
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}
+
+/* ---------- Docusaurus 风格工具类 ---------- */
+.doc-card {
+  background: var(--ifm-background-color);
+  border: 1px solid var(--ifm-border-color);
+  border-radius: var(--ifm-card-border-radius);
+  box-shadow: var(--ifm-global-shadow-lw);
+}
+
+.doc-card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--ifm-border-color);
+}
+
+.doc-card-body {
+  padding: 20px;
+}

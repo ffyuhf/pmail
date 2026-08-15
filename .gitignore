@@ -1,0 +1,43 @@
+# ===== 敏感配置（禁止入库）=====
+# SSL 私钥与证书请求文件
+server/config/ssl/private.key
+server/config/ssl/server.csr
+# 本地运行配置（含数据库 DSN/密码、推送凭据）
+server/config/config.json
+server/config/config_mysql.json
+server/config/config.dev.json
+
+# ===== 运行时数据 =====
+# SQLite 数据库文件（含邮件数据）
+*.db
+*.db-journal
+*.sqlite
+
+# ===== 依赖 =====
+# npm 依赖目录，由 package-lock.json / yarn.lock 还原
+node_modules/
+fe/node_modules/
+新前端构建/node_modules/
+
+# ===== 前端构建产物（Vite 产物与缓存） =====
+dist/
+fe/dist/
+新前端构建/dist/
+fe/.vite/
+新前端构建/.vite/
+
+# ===== 后端构建产物 =====
+server/pmail_*
+*.exe
+
+# ===== 大文件 =====
+# 原始项目压缩包
+原项目.zip
+
+# ===== IDE / 系统 / 临时文件 =====
+.vscode/
+.DS_Store
+*.log
+*.tmp
+*~
+*.swp
