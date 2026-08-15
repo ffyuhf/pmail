@@ -17,14 +17,19 @@ server/config/config.dev.json
 # npm 依赖目录，由 package-lock.json / yarn.lock 还原
 node_modules/
 fe/node_modules/
-新前端构建/node_modules/
 
 # ===== 前端构建产物（Vite 产物与缓存） =====
 dist/
 fe/dist/
-新前端构建/dist/
 fe/.vite/
-新前端构建/.vite/
+
+# ===== 打包/缓存产物（20260815 补充） =====
+# Makefile package 目标输出目录
+output/
+# tsc/vue-tsc 增量编译缓存
+*.tsbuildinfo
+# eslint 缓存
+.eslintcache
 
 # ===== 后端构建产物 =====
 server/pmail_*
@@ -33,6 +38,12 @@ server/pmail_*
 # ===== 大文件 =====
 # 原始项目压缩包
 原项目.zip
+
+# ===== 非源码内容（20260815 补充） =====
+# 新前端工作目录，独立开发暂不入版本库
+新前端构建/
+# 项目文档目录，非源码，不入版本库
+docs/
 
 # ===== IDE / 系统 / 临时文件 =====
 .vscode/
