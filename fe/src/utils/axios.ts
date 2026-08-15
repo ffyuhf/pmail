@@ -51,53 +51,14 @@ http.interceptors.response.use(async (response): Promise<any> => {
     }
     return response.data as ApiResponse;
 }, async (error) => {
-    //响应错误
-    if (error.response && error.response.status) {
-        let message = ""
-        switch (error.response.status) {
-            case 400:
-                message = '请求错误';
-                break;
-            case 401:
-                message = '请求错误';
-                break;
-            case 403:
-               await router.replace({
-                    path: '/login',
-                    query: {
-                        redirect: router.currentRoute.value.fullPath
-                    }
-                });
-                break;
-            case 404:
-                message = '请求地址出错';
-                break;
-            case 408:
-                message = '请求超时';
-                break;
-            case 500:
-                message = '服务器内部错误!';
-                break;
-            case 501:
-                message = '服务未实现!';
-                break;
-            case 502:
-                message = '网关错误!';
-                break;
-            case 503:
-                message = '服务不可用!';
-                break;
-            case 504:
-                message = '网关超时!';
-                break;
-            case 505:
-                message = 'HTTP版本不受支持';
-                break;
-            default:
-                // eslint-disable-next-line no-unused-vars
-                message = '请求失败';
-        }
-        return Promise.reject(error);
+    //响应错误：仅处理 403 登录态失效重定向，其余错误统一透传给调用方（错误提示由后端 errorMsg 承担）
+    if (error.response && error.response.status === 403) {
+        await router.replace({
+            path: '/login',
+            query: {
+                redirect: router.currentRoute.value.fullPath
+            }
+        });
     }
     return Promise.reject(error);
 });

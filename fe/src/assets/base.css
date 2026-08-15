@@ -20,6 +20,7 @@
 
   /* 语义色 */
   --ifm-color-primary: #25c2a0;
+  --ifm-color-primary-rgb: 37, 194, 160;
   --ifm-color-primary-dark: #21a78c;
   --ifm-color-primary-darker: #1e9a81;
   --ifm-color-primary-light: #3dcdb0;
@@ -108,6 +109,7 @@
     color-scheme: dark;
 
     --ifm-color-primary: #3dcea8;
+    --ifm-color-primary-rgb: 61, 206, 168;
     --ifm-color-primary-dark: #33b892;
     --ifm-color-primary-darker: #2faa87;
     --ifm-color-primary-light: #5ad6b4;

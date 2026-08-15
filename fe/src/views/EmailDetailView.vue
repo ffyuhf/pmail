@@ -23,12 +23,12 @@
       <div class="mail-detail__meta-card">
         <div class="mail-detail__meta-left">
           <div class="mail-detail__avatar">
-            {{ getInitial(detailData.from_name || detailData.from_address) }}
+            {{ getInitial(detailData.from_name || detailData.from_address || '') }}
           </div>
           <div class="mail-detail__meta-info">
             <div class="mail-detail__sender-line">
-              <span class="mail-detail__sender-name">{{ detailData.from_name !== '' ? detailData.from_name : detailData.from_address }}</span>
-              <span class="mail-detail__sender-email" v-if="detailData.from_name !== ''"><{{ detailData.from_address }}></span>
+              <span class="mail-detail__sender-name">{{ detailData.from_name ? detailData.from_name : detailData.from_address }}</span>
+              <span class="mail-detail__sender-email" v-if="detailData.from_name"><{{ detailData.from_address }}></span>
             </div>
             <div class="mail-detail__receivers-line">
               <span class="mail-detail__meta-label">{{ lang.to }}:</span>
@@ -45,7 +45,7 @@
           </div>
         </div>
         <div class="mail-detail__meta-right">
-          <div class="mail-detail__date">{{ formatDetailDate(detailData.send_date) }}</div>
+          <div class="mail-detail__date">{{ formatDetailDate(detailData.send_date || '') }}</div>
         </div>
       </div>
 
@@ -162,15 +162,15 @@ const handleDelete = () => {
   /** 通过 isTrashGroup 判断当前分组是否为垃圾箱（status === 3） */
   const forcedDel = isTrashGroup(groupStore.tag);
 
-  ElMessageBox.confirm(lang.del_email_confirm, 'Warning', {
-    confirmButtonText: 'OK',
-    cancelButtonText: 'Cancel',
+  ElMessageBox.confirm(lang.del_email_confirm, lang.warning, {
+    confirmButtonText: lang.ok,
+    cancelButtonText: lang.cancel,
     type: 'warning',
   }).then(() => {
     /** 通过 emailService 删除邮件，使用 ue_ids 精确匹配 user_email 记录 */
     emailService.deleteEmails({ids: [], forcedDel, ue_ids: [ueId]}).then((res: any) => {
       if (res.errorNo === 0) {
-        ElMessage.success('Deleted successfully');
+        ElMessage.success(lang.deleted_successfully);
         router.push({name: 'list'});
       } else {
         ElMessage.error(res.errorMsg);

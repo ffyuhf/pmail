@@ -120,7 +120,7 @@
       <div class="setup__form" width="600px" v-for="(info,domain) in dnsInfos" :key="info">
         <h3>{{ domain }}</h3>
         <el-table :data="info" border style="width: 100%">
-          <el-table-column prop="host" label="HOSTNAME" width="110px">
+          <el-table-column prop="host" :label="lang.hostname" width="110px">
             <template #default="scope">
               <div style="display: flex; align-items: center">
                 <el-tooltip :content="lang.dns_root_desc" placement="top"
@@ -131,8 +131,8 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="type" label="TYPE" width="110px"/>
-          <el-table-column prop="value" label="VALUE">
+          <el-table-column prop="type" :label="lang.record_type" width="110px"/>
+          <el-table-column prop="value" :label="lang.record_value">
             <template #default="scope">
               <div style="display: flex; align-items: center">
                 <el-tooltip :content="scope.row.tips" placement="top" v-if="scope.row.tips !== ''">
@@ -147,7 +147,7 @@
       </div>
     </div>
 
-    <el-alert :closable="false" title="Warning!" type="error" center
+    <el-alert :closable="false" :title="lang.warning_title" type="error" center
               v-if="active === 5 && sslSettings.type === '0' && port !== 80" :description="lang.autoSSLWarn"/>
 
     <div v-if="active === 5" class="setup__card">
@@ -201,9 +201,9 @@
     <div v-if="dnsChecking">
       <label>{{ lang.dns_desc }}</label>
       <el-table :data="sslSettings.paramsList" border v-loading="sslSettings.paramsList.length === 0">
-        <el-table-column prop="host" label="HOSTNAME" width="110px"/>
-        <el-table-column prop="type" label="TYPE" width="110px"/>
-        <el-table-column prop="value" label="VALUE">
+        <el-table-column prop="host" :label="lang.hostname" width="110px"/>
+        <el-table-column prop="type" :label="lang.record_type" width="110px"/>
+        <el-table-column prop="value" :label="lang.record_value">
           <template #default="scope">
             <div style="display: flex; align-items: center">
               <el-tooltip :content="scope.row.tips" placement="top" v-if="scope.row.tips !== ''">
@@ -484,7 +484,6 @@ const getSSLDNSParams = () => {
       ElMessage.error(res.errorMsg)
     } else {
       sslSettings.paramsList = res.data
-      console.log(sslSettings.paramsList)
     }
   })
 

@@ -38,7 +38,7 @@
               <template #default>
                 <div class="composer__sender-edit">
                   <div class="composer__edit-row">
-                    <span class="composer__edit-label">Prefix</span>
+                    <span class="composer__edit-label">{{ lang.prefix }}</span>
                     <el-input
                       :disabled="!(globalStatus.userInfos.is_admin)"
                       v-model="ruleForm.sender"
@@ -46,7 +46,7 @@
                     />
                   </div>
                   <div class="composer__edit-row">
-                    <span class="composer__edit-label">Domain</span>
+                    <span class="composer__edit-label">{{ lang.domain }}</span>
                     <el-select v-model="ruleForm.pickDomain" class="composer__w-full">
                       <el-option :value="item" v-for="item in ruleForm.domains" :key="item">{{ item }}</el-option>
                     </el-select>
@@ -67,7 +67,7 @@
             <el-select
               v-model="ruleForm.receivers"
               multiple filterable allow-create :reserve-keyword="false"
-              placeholder="Recipients..."
+              :placeholder="lang.recipients_ph"
             ></el-select>
           </el-form-item>
         </div>
@@ -78,7 +78,7 @@
             <el-select
               v-model="ruleForm.cc"
               multiple filterable allow-create :reserve-keyword="false"
-              placeholder="Cc..."
+              :placeholder="lang.cc_ph"
             ></el-select>
           </el-form-item>
         </div>
@@ -89,15 +89,15 @@
             <el-select
               v-model="ruleForm.bcc"
               multiple filterable allow-create :reserve-keyword="false"
-              placeholder="Bcc..."
+              :placeholder="lang.bcc_ph"
             ></el-select>
           </el-form-item>
         </div>
 
         <div class="composer__row composer__row--subject">
           <el-form-item prop="subject" class="composer__w-full composer__m0 composer__borderless-input">
-            <el-input v-model="ruleForm.subject" placeholder="Subject"></el-input>
-            <div class="composer__cc-bcc-toggle" @click="showCcBcc = !showCcBcc" v-if="!showCcBcc">Cc/Bcc</div>
+            <el-input v-model="ruleForm.subject" :placeholder="lang.subject_ph"></el-input>
+            <div class="composer__cc-bcc-toggle" @click="showCcBcc = !showCcBcc" v-if="!showCcBcc">{{ lang.cc_bcc }}</div>
           </el-form-item>
         </div>
 
@@ -184,7 +184,7 @@
       </div>
 
       <template #footer>
-        <el-button @click="csvDialogVisible = false">{{ lang.fail === 'Fail!' ? 'Cancel' : '取消' }}</el-button>
+        <el-button @click="csvDialogVisible = false">{{ lang.cancel }}</el-button>
         <el-button
           type="primary"
           :disabled="csvSelectedCount === 0"
@@ -232,7 +232,7 @@ const valueHtml = ref('<p><br></p>')
 const toolbarConfig: Record<string, any> = {}
 const editorConfig: Record<string, any> = {
   MENU_CONF: {},
-  placeholder: 'Write your message...'
+  placeholder: lang.write_message_ph
 }
 
 editorConfig.MENU_CONF['uploadImage'] = {
@@ -361,7 +361,7 @@ const send = function (formEl: any) {
   formEl.validate((valid: boolean) => {
     if (valid) {
       if(ruleForm.receivers.length === 0 && ruleForm.cc.length === 0 && ruleForm.bcc.length === 0) {
-        ElMessage.warning("Please specify at least one recipient");
+        ElMessage.warning(lang.err_no_recipient);
         return;
       }
       let objectTos = ruleForm.receivers.map(e => ({name: "", email: e}));

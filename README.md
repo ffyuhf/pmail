@@ -36,6 +36,8 @@ jinnrry作者更的太慢了，功能对我来说太少了
 - DKIM 使用 2048 位 RSA 密钥签名
 - CSRF 防护 + IDOR 越权访问防护
 - Setup 初始化接口安全加固
+- 收信认证结果（SPF/DKIM）防篡改，插件无法修改认证结果
+- 插件设置页管理员权限校验（非管理员拒绝访问）
 
 ### 4、HTML 邮件兼容性
 
@@ -46,6 +48,8 @@ jinnrry作者更的太慢了，功能对我来说太少了
 - 邮件关键词搜索、批量操作、每页条数选择
 - 编辑器全屏模式
 - 暗色模式、布局自适应
+- API Token 可视化管理（生成、复制、撤销、有效期选择）
+- 界面中英双语完整国际化
 
 ### 6、自动SSL证书
 
@@ -61,6 +65,13 @@ jinnrry作者更的太慢了，功能对我来说太少了
 ### 8、多域名、多用户支持
 
 支持多域名、多用户且完整支持收发邮件
+
+### 9、邮件规则与自动转发
+
+- 规则引擎：按条件（发件人/收件人/主题等）自动执行移动、转发动作
+- 原始转发保留 DKIM 签名，转发后不易被判定为垃圾邮件
+- 转发头部标准化：From 使用本地用户身份（修复 SPF 拒信）、Reply-To 指向原发件人，并附 X-Original-From / X-Forwarded-By / X-Forwarded-To 追踪头
+- 账户级转发自环检测，防止无限循环转发
 
 # 如何部署
 
@@ -114,7 +125,7 @@ Please click http://YOUR_IP/#/setup?token=xxxxxxxx to continue.
 ```jsonc
 {
   // ===== 基础设置 =====
-  "logLevel": "info",              // 日志级别：debug / info / warn / error
+  "logLevel": "info",              // 日志级别：debug / info / warn / error（debug 级别额外输出 SQL 语句，排障用）
   "domain": "domain.com",          // 主域名
   "domains": ["domain.com"],       // 所有收信域名（多域名时填写全部）
   "webDomain": "mail.domain.com",  // Web 管理后台域名

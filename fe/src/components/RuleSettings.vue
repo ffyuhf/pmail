@@ -6,7 +6,7 @@
         <el-table-column prop="name" :label="lang.rule_name" min-width="150" show-overflow-tooltip/>
         <el-table-column prop="action" :label="lang.rule_do" width="120">
           <template #default="scope">
-            <el-tag size="small" effect="plain" class="settings-tag">{{ ActionName[scope.row.action] }}</el-tag>
+            <el-tag size="small" effect="plain" class="settings__tag">{{ ActionName[scope.row.action] }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="params" :label="lang.rule_params" min-width="150" show-overflow-tooltip/>
@@ -15,7 +15,7 @@
           <template #default="scope">
             <div class="settings__row-actions">
               <el-button size="small" type="primary" :icon="Edit" circle text @click="editRule(scope.row)"/>
-              <el-popconfirm confirm-button-text="Yes" cancel-button-text="No" :icon="InfoFilled"
+              <el-popconfirm :confirm-button-text="lang.yes" :cancel-button-text="lang.no" :icon="InfoFilled"
                              @confirm="delRule(scope.row.id)" icon-color="#ef4444" :title="lang.del_rule_confirm">
                 <template #reference>
                   <el-button size="small" type="danger" :icon="Delete" circle text/>
@@ -33,12 +33,12 @@
       </el-button>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="addRuleForm.id > 0 ? 'Edit Rule' : lang.new_rule" width="700px" class="settings__dialog">
+    <el-dialog v-model="dialogVisible" :title="addRuleForm.id > 0 ? lang.edit_rule : lang.new_rule" width="700px" class="settings__dialog">
       <div class="settings__dialog-content">
         <el-form :model="addRuleForm" label-position="top">
           <div class="form-row">
             <el-form-item :label="lang.rule_name" class="flex-grow">
-              <el-input v-model="addRuleForm.name" placeholder="Rule Name"/>
+              <el-input v-model="addRuleForm.name" :placeholder="lang.rule_name_ph"/>
             </el-form-item>
             <el-form-item :label="lang.rule_priority" class="w-32">
               <el-input v-model="addRuleForm.sort" type="number" oninput="value=value.replace(/[^\-\d]/g, '')"/>
@@ -46,11 +46,11 @@
           </div>
           
           <el-divider class="custom-divider"/>
-          <div class="section-title">{{ lang.rule_desc }} (Conditions)</div>
+          <div class="section-title">{{ lang.rule_desc }} ({{ lang.conditions }})</div>
           
           <div class="rules-list">
             <div v-for="(rule, index) in addRuleForm.rules" :key="index" class="rule-line">
-              <el-select v-model="rule.field" placeholder="Field" class="w-32">
+              <el-select v-model="rule.field" :placeholder="lang.field_ph" class="w-32">
                 <el-option key="From" :label="lang.from" value="From"/>
                 <el-option key="Subject" :label="lang.subject" value="Subject"/>
                 <el-option key="To" :label="lang.to" value="To"/>
@@ -58,42 +58,42 @@
                 <el-option key="Content" :label="lang.content" value="Content"/>
               </el-select>
 
-              <el-select v-model="rule.type" placeholder="Type" class="w-32">
+              <el-select v-model="rule.type" :placeholder="lang.type_ph" class="w-32">
                 <el-option key="equal" :label="lang.equal" value="equal"/>
                 <el-option key="contains" :label="lang.contains" value="contains"/>
                 <el-option key="regex" :label="lang.regex" value="regex"/>
               </el-select>
 
-              <el-input v-model="rule.rule" placeholder="Value" class="flex-grow"/>
+              <el-input v-model="rule.rule" :placeholder="lang.value_ph" class="flex-grow"/>
               <el-button type="danger" :icon="Delete" @click="removeRuleLine(index)" text circle/>
             </div>
           </div>
           <div class="add-condition-action">
-            <el-button size="small" type="primary" plain @click="addRule()"><el-icon><Plus/></el-icon> Add Condition</el-button>
+            <el-button size="small" type="primary" plain @click="addRule()"><el-icon><Plus/></el-icon> {{ lang.add_condition }}</el-button>
           </div>
 
           <el-divider class="custom-divider"/>
-          <div class="section-title">{{ lang.rule_do }} (Action)</div>
+          <div class="section-title">{{ lang.rule_do }} ({{ lang.action }})</div>
           
           <div class="action-row">
-            <el-select v-model="addRuleForm.action" placeholder="Select Action" @change="ruleTypeChange" class="w-48">
+            <el-select v-model="addRuleForm.action" :placeholder="lang.select_action_ph" @change="ruleTypeChange" class="w-48">
               <el-option key="mark_read" :label="lang.mark_read" :value="READ"/>
               <el-option key="move" :label="lang.move" :value="MOVE"/>
               <el-option key="delete" :label="lang.delete" :value="DELETE"/>
               <el-option key="forward" :label="lang.forward" :value="FORWARD"/>
             </el-select>
             
-            <el-select v-if="addRuleForm.action === 4" v-model="addRuleForm.params" @click="refreshGroupInfos" placeholder="Select Folder" class="flex-grow">
+            <el-select v-if="addRuleForm.action === 4" v-model="addRuleForm.params" @click="refreshGroupInfos" :placeholder="lang.select_folder_ph" class="flex-grow">
               <el-option v-for="gp in groupData.list" :key="gp.id" :label="gp.name" :value="gp.id"/>
             </el-select>
 
-            <el-input v-if="addRuleForm.action === 2" v-model="addRuleForm.params" class="flex-grow" placeholder="Forward Email Address"/>
+            <el-input v-if="addRuleForm.action === 2" v-model="addRuleForm.params" class="flex-grow" :placeholder="lang.forward_email_ph"/>
           </div>
         </el-form>
       </div>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">Cancel</el-button>
+          <el-button @click="dialogVisible = false">{{ lang.cancel }}</el-button>
           <el-button type="primary" @click="submitRule()">
             {{ lang.submit }}
           </el-button>

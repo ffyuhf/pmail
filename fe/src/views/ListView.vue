@@ -76,8 +76,8 @@
             <div class="mail-list__row" :class="{'mail-list__row--unread': !scope.row.is_read}">
               <div class="mail-list__row-main">
                 <!-- 邮件类型标签：自定义文件夹中区分发送/接收邮件。修改日期: 20260510 -->
-                <span v-if="scope.row.type === 1" class="mail-list__type-tag mail-list__type-tag--sent" :title="lang.outbox || 'Sent'">↗</span>
-                <span v-else class="mail-list__type-tag mail-list__type-tag--received" :title="lang.inbox || 'Received'">↙</span>
+                <span v-if="scope.row.type === 1" class="mail-list__type-tag mail-list__type-tag--sent" :title="lang.outbox">↗</span>
+                <span v-else class="mail-list__type-tag mail-list__type-tag--received" :title="lang.inbox">↙</span>
                 <div class="mail-list__sender">
                   {{ scope.row.sender.Name !== '' ? scope.row.sender.Name : scope.row.sender.EmailAddress }}
                 </div>
@@ -248,7 +248,7 @@ const toggleSelectAll = (val: boolean | string) => {
 /** 获取选中行的 ue_id 列表（user_email.id，精确匹配记录）。修改日期: 20260510 */
 const getSelectedUeIds = (): number[] | null => {
   if (selectedRows.value.length === 0) {
-    ElMessage.warning('Select emails first');
+    ElMessage.warning(lang.select_emails_first);
     return null;
   }
   return selectedRows.value.map((e: EmailListItem) => e.ue_id);
@@ -257,7 +257,7 @@ const getSelectedUeIds = (): number[] | null => {
 /** 获取选中行的 email id 列表（用于标记已读等旧接口）。修改日期: 20260510 */
 const getSelectedIds = (): number[] | null => {
   if (selectedRows.value.length === 0) {
-    ElMessage.warning('Select emails first');
+    ElMessage.warning(lang.select_emails_first);
     return null;
   }
   return selectedRows.value.map((e: EmailListItem) => e.id);
@@ -270,7 +270,7 @@ const markRead = function () {
   emailService.markEmailsRead(ids).then((res: any) => {
     if (res.errorNo === 0) {
       updateList()
-      ElMessage.success('Marked as read');
+      ElMessage.success(lang.marked_as_read);
     } else {
       ElMessage.error(res.errorMsg)
     }
@@ -280,14 +280,14 @@ const markRead = function () {
 const move = function (group_id: string, group_name: string) {
   const ids = getSelectedIds();
   if (!ids) return;
-  ElMessageBox.confirm(lang.move_email_confirm, 'Warning', {
-    confirmButtonText: 'OK', cancelButtonText: 'Cancel', type: 'warning'
+  ElMessageBox.confirm(lang.move_email_confirm, lang.warning, {
+    confirmButtonText: lang.ok, cancelButtonText: lang.cancel, type: 'warning'
   }).then(() => {
     // 修改日期: 20260510 — 使用 ue_ids 精确匹配 user_email 记录
   emailService.moveEmails({group_id, group_name, ids: [], ue_ids: getSelectedUeIds()!}).then((res: any) => {
       if (res.errorNo === 0) {
         updateList()
-        ElMessage.success('Move completed')
+        ElMessage.success(lang.move_completed)
       } else {
         ElMessage.error(res.errorMsg)
       }
@@ -302,14 +302,14 @@ const del = function () {
   /** 通过 isTrashGroup 判断当前分组是否为垃圾箱（status === 3） */
   const forcedDel = isTrashGroup(tag);
 
-  ElMessageBox.confirm(lang.del_email_confirm, 'Warning', {
-    confirmButtonText: 'OK', cancelButtonText: 'Cancel', type: 'warning'
+  ElMessageBox.confirm(lang.del_email_confirm, lang.warning, {
+    confirmButtonText: lang.ok, cancelButtonText: lang.cancel, type: 'warning'
   }).then(() => {
     // 修改日期: 20260510 — 使用 ue_ids 精确匹配 user_email 记录
     emailService.deleteEmails({ids: [], forcedDel, ue_ids: getSelectedUeIds()!}).then((res: any) => {
       if (res.errorNo === 0) {
         updateList()
-        ElMessage.success('Deleted successfully')
+        ElMessage.success(lang.deleted_successfully)
       } else {
         ElMessage.error(res.errorMsg)
       }

@@ -74,13 +74,6 @@
   background-color: var(--ifm-background-surface-color);
 }
 
-/* ===== 分页器 ===== */
-.settings__pagination {
-  margin-top: 20px;
-  display: flex;
-  justify-content: center;
-}
-
 /* ===== 按钮通用样式 ===== */
 .settings__btn {
   border-radius: var(--ifm-global-radius);

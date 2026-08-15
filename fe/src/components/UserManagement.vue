@@ -16,12 +16,12 @@
         <el-table-column align="right" width="100">
           <template #header>
             <el-button type="primary" size="small" @click="createUser" class="settings__btn" plain>
-              <el-icon><Plus/></el-icon> New
+              <el-icon><Plus/></el-icon> {{ lang.new_btn }}
             </el-button>
           </template>
           <template #default="scope">
             <el-button size="small" type="primary" text bg @click="handleEdit(scope.$index, scope.row)" class="settings__btn">
-              Edit
+              {{ lang.edit }}
             </el-button>
           </template>
         </el-table-column>
@@ -56,7 +56,7 @@
 
           <el-form-item>
             <div class="status-switch">
-              <span class="switch-label">Status</span>
+              <span class="switch-label">{{ lang.status }}</span>
               <el-switch 
                 v-model="editUserInfo.disabled" 
                 class="ml-2" 
@@ -71,8 +71,8 @@
       </div>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="userInfoDialog = false">Cancel</el-button>
-          <el-button type="primary" @click="submit">Confirm</el-button>
+          <el-button @click="userInfoDialog = false">{{ lang.cancel }}</el-button>
+          <el-button type="primary" @click="submit">{{ lang.confirm }}</el-button>
         </span>
       </template>
     </el-dialog>

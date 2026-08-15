@@ -8,9 +8,9 @@
             <iframe :src="src"></iframe>
           </div>
         </el-tab-pane>
-        <el-tab-pane v-if="Object.keys(pluginList).length === 0" label="No Plugins">
+        <el-tab-pane v-if="Object.keys(pluginList).length === 0" :label="lang.no_plugins">
           <div class="empty-state">
-            <el-empty description="No plugins are currently installed" :image-size="120" />
+            <el-empty :description="lang.no_plugins_desc" :image-size="120" />
           </div>
         </el-tab-pane>
       </el-tabs>

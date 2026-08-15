@@ -29,16 +29,16 @@
       <ul class="menu__list">
         <li
           v-for="item in treeData"
-          :key="item.label"
+          :key="item.id"
           class="menu__list-item"
         >
           <!-- 有子节点：渲染为可折叠分组标题 -->
           <template v-if="item.children && item.children.length > 0">
             <a
               class="menu__group-title"
-              @click="toggleGroup(item.label)"
+              @click="toggleGroup(item.id)"
             >
-              <span class="menu__group-arrow" :class="{ 'menu__group-arrow--expanded': expandedGroups[item.label] }">▶</span>
+              <span class="menu__group-arrow" :class="{ 'menu__group-arrow--expanded': expandedGroups[item.id] }">▶</span>
               <span>{{ item.label }}</span>
             </a>
             <!-- 子节点列表：使用 Transition 实现展开/折叠高度动画 -->
@@ -48,7 +48,7 @@
               @after-enter="onSlideAfterEnter"
               @leave="onSlideLeave"
             >
-              <ul v-if="expandedGroups[item.label]" class="menu__sub-list">
+              <ul v-if="expandedGroups[item.id]" class="menu__sub-list">
                 <li
                   v-for="child in item.children"
                   :key="child.tag"
@@ -111,7 +111,7 @@ const treeData = ref<GroupItem[]>([]);
 const searchQuery = ref("");
 const activeGroup = ref(groupStore.tag);
 
-/** 各分组的展开/折叠状态，key 为分组 label */
+/** 各分组的展开/折叠状态，key 为分组 id（多域名同名分组不冲突） */
 const expandedGroups = reactive<Record<string, boolean>>({});
 
 // 保持活动菜单与 store 同步
@@ -125,14 +125,14 @@ groupService.getGroupTree().then((res: any) => {
     treeData.value = res.data;
     // 默认展开第一个分组（"全部邮件数据"），确保用户首次看到常用文件夹
     if (res.data.length > 0) {
-      expandedGroups[res.data[0].label] = true;
+      expandedGroups[res.data[0].id] = true;
     }
   }
 });
 
-/** 切换分组的展开/折叠状态 */
-const toggleGroup = function (label: string) {
-  expandedGroups[label] = !expandedGroups[label];
+/** 切换分组的展开/折叠状态（按 id 定位，避免同名分组 key 冲突） */
+const toggleGroup = function (id: number) {
+  expandedGroups[id] = !expandedGroups[id];
 };
 
 /** Transition 钩子：子列表进入时，从高度 0 过渡到实际高度 */
