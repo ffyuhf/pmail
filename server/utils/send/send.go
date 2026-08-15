@@ -4,6 +4,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"net"
+	"strings"
+	"sync"
+
 	"github.com/ffyuhf/pmail/config"
 	"github.com/ffyuhf/pmail/dto/parsemail"
 	"github.com/ffyuhf/pmail/models"
@@ -13,9 +17,6 @@ import (
 	"github.com/ffyuhf/pmail/utils/context"
 	"github.com/ffyuhf/pmail/utils/smtp"
 	log "github.com/sirupsen/logrus"
-	"net"
-	"strings"
-	"sync"
 )
 
 type mxDomain struct {
@@ -24,21 +25,43 @@ type mxDomain struct {
 }
 
 // Forward 转发邮件
+// 以本地用户身份作为 envelope from 投递，避免以原发件人身份转发导致 SPF 校验失败。
 func Forward(ctx *context.Context, e *parsemail.Email, forwardAddress string, user *models.User) error {
 
 	log.WithContext(ctx).Debugf("开始转发邮件")
 
-	b := e.ForwardBuildBytes(ctx, user)
+	b := e.ForwardBuildBytes(ctx, user, forwardAddress)
 
 	log.WithContext(ctx).Debugf("%s", b)
 
+	from := user.Account + "@" + config.Instance.Domains[0]
+	return forwardData(ctx, config.Instance.Domains[0], b, forwardAddress, from)
+}
+
+// ForwardRaw 以原始邮件字节直接转发，避免重新封装导致 DKIM 签名失效。
+// 参数：
+//   - ctx: 请求上下文
+//   - e: 已解析的邮件对象
+//   - rawEmailData: SMTP 收到的原始邮件字节
+//   - forwardAddress: 转发目标地址
+//   - user: 触发转发规则的用户（作为投递发件人）
+//
+// 返回值：投递错误
+func ForwardRaw(ctx *context.Context, e *parsemail.Email, rawEmailData []byte, forwardAddress string, user *models.User) error {
+	log.WithContext(ctx).Debugf("开始原始邮件转发")
+
+	from := user.Account + "@" + config.Instance.Domains[0]
+	return forwardData(ctx, config.Instance.Domains[0], rawEmailData, forwardAddress, from)
+}
+
+// forwardData 向单一转发地址投递指定邮件数据。
+func forwardData(ctx *context.Context, fromDomain string, data []byte, forwardAddress string, from string) error {
 	var to []*parsemail.User
 	to = []*parsemail.User{
 		{EmailAddress: forwardAddress},
 	}
 
-	err, _ := doSend(ctx, config.Instance.Domains[0], b, to, e.From.EmailAddress)
-
+	err, _ := doSend(ctx, fromDomain, data, to, from)
 	return err
 }
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/ffyuhf/pmail/dto"
+	"github.com/ffyuhf/pmail/dto/parsemail"
 	"github.com/ffyuhf/pmail/dto/response"
 	"github.com/ffyuhf/pmail/services/list"
 	"github.com/ffyuhf/pmail/utils/context"
@@ -80,8 +81,17 @@ func EmailList(ctx *context.Context, w http.ResponseWriter, req *http.Request) {
 		var sender User
 		_ = json.Unmarshal([]byte(email.Sender), &sender)
 
+		// Sender 头为空时回退使用 From 头信息，保证发件人展示不缺失
+		if sender.EmailAddress == "" {
+			sender.EmailAddress = email.FromAddress
+			sender.Name = email.FromName
+		}
+
 		var tos []User
 		_ = json.Unmarshal([]byte(email.To), &tos)
+
+		// 认证结论统一由 parsemail.NewEmailAuthentication 生成
+		authentication := parsemail.NewEmailAuthentication(email.SPFCheck == 1, email.DKIMCheck == 1)
 
 		lst = append(lst, &emilItem{
 			ID:        email.Id,
@@ -93,7 +103,7 @@ func EmailList(ctx *context.Context, w http.ResponseWriter, req *http.Request) {
 			IsRead:    email.IsRead == 1,
 			Sender:    sender,
 			To:        tos,
-			Dangerous: email.SPFCheck == 0 && email.DKIMCheck == 0,
+			Dangerous: authentication.Dangerous,
 			Error:     email.Error.String,
 		})
 	}

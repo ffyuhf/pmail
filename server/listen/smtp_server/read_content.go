@@ -168,15 +168,22 @@ func (s *Session) Data(r io.Reader) error {
 		SPFStatus = spfCheck(s.RemoteAddress.String(), email.Sender, email.Sender.EmailAddress)
 		pmailLog.SmtpInfof(ctx, pmailLog.EventSMTPSPF, "结果=%v IP=%s 发送者=%s", SPFStatus, s.RemoteAddress.String(), email.Sender.EmailAddress)
 
+		// SPF/DKIM 校验完成后生成统一认证结论，供插件链、规则与落库共享
+		email.Authentication = parsemail.NewEmailAuthentication(SPFStatus, dkimStatus)
+
 		// 执行 ReceiveParseAfter 插件链
 		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=接收解析后 开始")
 		for _, hook := range hooks.HookList {
 			if hook == nil {
 				continue
 			}
+			// 主程序认证结果不能被插件修改后带入数据库和后续钩子，每个插件执行前重置。
+			email.Authentication = parsemail.NewEmailAuthentication(SPFStatus, dkimStatus)
 			hook.ReceiveParseAfter(ctx, email)
 		}
 		pmailLog.SmtpDebug(ctx, pmailLog.EventSMTPPlugin, "插件=接收解析后 结束")
+		// 钩子链执行完毕后再次重置，保证落库与后续流程使用权威认证结果。
+		email.Authentication = parsemail.NewEmailAuthentication(SPFStatus, dkimStatus)
 
 		// 修改日期: 20260610 — #12 修复 Sender 头未参与伪造检测
 		// 同时检查 From 和 Sender 头的域名，防止通过 Sender 头伪造发件人
@@ -212,7 +219,7 @@ func (s *Session) Data(r io.Reader) error {
 				rs := rule.GetAllRules(ctx, user.ID)
 				for _, r := range rs {
 					if rule.MatchRule(ctx, r, email) {
-						rule.DoRule(ctx, r, email, user)
+						rule.DoRule(ctx, r, email, user, emailData)
 					}
 				}
 			}
@@ -251,6 +258,11 @@ func (s *Session) Data(r io.Reader) error {
 // saveEmail 将邮件保存到数据库，并根据收件人匹配用户。
 // 对于收件流程（emailType=0），查找匹配的本地用户；找不到时根据垃圾邮件过滤策略决定丢弃或转交管理员。
 func saveEmail(ctx *pmailContext.Context, size int, email *parsemail.Email, sendUserID int, emailType int, reallyTo []string, SPFStatus, dkimStatus bool) ([]*models.User, *models.Email, error) {
+	// 认证隔离：收信路径以 Authentication 为准；发件路径（emailType!=0）参数不被收信认证对象污染。
+	if emailType == 0 && email != nil && email.Authentication != nil {
+		SPFStatus = email.Authentication.SPFPassed
+		dkimStatus = email.Authentication.DKIMPassed
+	}
 	var dkimV, spfV int8
 	if dkimStatus {
 		dkimV = 1

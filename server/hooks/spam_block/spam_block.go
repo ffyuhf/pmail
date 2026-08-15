@@ -4,6 +4,12 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/ffyuhf/pmail/dto/parsemail"
 	"github.com/ffyuhf/pmail/hooks/framework"
 	"github.com/ffyuhf/pmail/hooks/spam_block/tools"
@@ -11,11 +17,6 @@ import (
 	"github.com/ffyuhf/pmail/utils/context"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
-	"io"
-	"net/http"
-	"os"
-	"strings"
-	"time"
 )
 
 type SpamBlock struct {
@@ -62,6 +63,10 @@ func (s *SpamBlock) SettingsHtml(ctx *context.Context, url string, requestData s
 `)
 		}
 		return fmt.Sprintf(index, s.cfg.ApiURL, s.cfg.ApiTimeout, s.cfg.Threshold)
+	}
+	// 修改日期: 20260815 — 移植母项目安全改进：非管理员禁止修改插件配置
+	if !ctx.IsAdmin {
+		return "No Access Privileges"
 	}
 
 	var cfg SpamBlockConfig

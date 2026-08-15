@@ -53,25 +53,48 @@ type Attachment struct {
 	ContentID   string
 }
 
+// EmailAuthentication 表示收信时的发件人身份认证结果。
+// 由 NewEmailAuthentication 统一生成，SPF 与 DKIM 均未通过时标记为 Dangerous。
+type EmailAuthentication struct {
+	SPFPassed  bool
+	DKIMPassed bool
+	Dangerous  bool
+}
+
+// NewEmailAuthentication 根据 SPF 和 DKIM 结果创建统一的邮件认证结论。
+// 参数：
+//   - spfPassed: SPF 校验是否通过
+//   - dkimPassed: DKIM 校验是否通过
+//
+// 返回值：认证结论对象，SPF 与 DKIM 均未通过时 Dangerous 为 true。
+func NewEmailAuthentication(spfPassed, dkimPassed bool) *EmailAuthentication {
+	return &EmailAuthentication{
+		SPFPassed:  spfPassed,
+		DKIMPassed: dkimPassed,
+		Dangerous:  !spfPassed && !dkimPassed,
+	}
+}
+
 // Email 邮件消息类型
 type Email struct {
-	ReplyTo     []*User
-	From        *User
-	To          []*User
-	Bcc         []*User
-	Cc          []*User
-	Subject     string
-	Text        []byte // 纯文本消息（可选）
-	HTML        []byte // HTML 消息（可选）
-	Sender      *User  // 覆盖 From 作为 SMTP 信封发件人（可选）
-	Headers     textproto.MIMEHeader
-	Attachments []*Attachment
-	ReadReceipt []string
-	Date        string
-	Status      int // 0未发送，1已发送，2发送失败，3删除，5广告邮件
-	MessageId   int64
-	MsgID       string // 符合 RFC 规范的 Message-ID，持久化存储在数据库中
-	Size        int
+	ReplyTo        []*User
+	From           *User
+	To             []*User
+	Bcc            []*User
+	Cc             []*User
+	Subject        string
+	Text           []byte // 纯文本消息（可选）
+	HTML           []byte // HTML 消息（可选）
+	Sender         *User  // 覆盖 From 作为 SMTP 信封发件人（可选）
+	Headers        textproto.MIMEHeader
+	Attachments    []*Attachment
+	ReadReceipt    []string
+	Date           string
+	Status         int // 0未发送，1已发送，2发送失败，3删除，5广告邮件
+	MessageId      int64
+	MsgID          string // 符合 RFC 规范的 Message-ID，持久化存储在数据库中
+	Size           int
+	Authentication *EmailAuthentication // 收信时的发件人认证结果，发件邮件为 nil
 }
 
 // GenerateMsgID 生成符合 RFC 规范的 Message-ID，具有足够唯一性以避免被垃圾邮件过滤器拦截。
@@ -226,7 +249,7 @@ func NewEmailFromModel(d models.Email) *Email {
 	var Attachments []*Attachment
 	json.Unmarshal([]byte(d.Attachments), &Attachments)
 
-	return &Email{
+	ret := &Email{
 		MessageId: cast.ToInt64(d.Id),
 		MsgID:     d.MsgID,
 		From: &User{
@@ -244,6 +267,11 @@ func NewEmailFromModel(d models.Email) *Email {
 		Attachments: Attachments,
 		Date:        d.SendDate.Format("2006-01-02 15:04:05"),
 	}
+	// 仅收件邮件（Type==0）恢复认证结果，发件邮件不携带收信认证信息
+	if d.Type == 0 {
+		ret.Authentication = NewEmailAuthentication(d.SPFCheck == 1, d.DKIMCheck == 1)
+	}
+	return ret
 }
 
 func NewEmailFromReader(to []string, r io.Reader, size int) *Email {
@@ -468,40 +496,35 @@ func buildUsers(strs []string) []*User {
 	return ret
 }
 
-func (e *Email) ForwardBuildBytes(ctx *context.Context, sender *models.User) []byte {
+func (e *Email) ForwardBuildBytes(ctx *context.Context, sender *models.User, forwardAddress string) []byte {
 	var b bytes.Buffer
 
-	from := []*mail.Address{{e.From.Name, e.From.EmailAddress}}
-	to := []*mail.Address{}
-	for _, user := range e.To {
-		to = append(to, &mail.Address{
-			Name:    user.Name,
-			Address: user.EmailAddress,
-		})
-	}
+	// 转发目标为规则配置的单个转发地址
+	forwardUser := buildUser(forwardAddress)
+	to := []*mail.Address{{forwardUser.Name, forwardUser.EmailAddress}}
 
-	senderAddress := []*mail.Address{{sender.Name, fmt.Sprintf("%s@%s", sender.Account, config.Instance.Domains[0])}}
+	senderEmailAddress := fmt.Sprintf("%s@%s", sender.Account, config.Instance.Domains[0])
+	senderAddress := []*mail.Address{{sender.Name, senderEmailAddress}}
 	// 创建邮件头
 	var h mail.Header
 	h.SetDate(time.Now())
-	h.SetAddressList("From", from)
+	// 转发邮件以本地用户身份作为 From，避免以原发件人身份投递导致 SPF 校验失败
+	h.SetAddressList("From", senderAddress)
 	h.SetAddressList("Sender", senderAddress)
 	h.SetAddressList("To", to)
-	h.SetText("Subject", e.Subject)
-	if e.MsgID != "" {
-		h.SetMessageID(e.MsgID)
-	} else {
-		h.SetMessageID(fmt.Sprintf("%d@%s", e.MessageId, config.Instance.Domain))
+	if e.From != nil && e.From.EmailAddress != "" {
+		// Reply-To 指向原发件人，X-Original-From 保留原始发件信息
+		h.SetAddressList("Reply-To", []*mail.Address{{e.From.Name, e.From.EmailAddress}})
+		h.Set("X-Original-From", e.From.Build())
 	}
-	if len(e.Cc) != 0 {
-		cc := []*mail.Address{}
-		for _, user := range e.Cc {
-			cc = append(cc, &mail.Address{
-				Name:    user.Name,
-				Address: user.EmailAddress,
-			})
-		}
-		h.SetAddressList("Cc", cc)
+	h.Set("X-Forwarded-By", senderEmailAddress)
+	h.Set("X-Forwarded-To", forwardUser.EmailAddress)
+	h.SetText("Subject", e.Subject)
+	// 转发邮件生成新的 Message-ID，并通过 References/In-Reply-To 关联原邮件
+	h.SetMessageID(GenerateMsgID(config.Instance.Domain))
+	if e.MsgID != "" {
+		h.Set("References", fmt.Sprintf("<%s>", e.MsgID))
+		h.Set("In-Reply-To", fmt.Sprintf("<%s>", e.MsgID))
 	}
 
 	// 创建邮件写入器
@@ -554,6 +577,11 @@ func (e *Email) ForwardBuildBytes(ctx *context.Context, sender *models.User) []b
 	}
 
 	mw.Close()
+
+	// DKIM 未初始化时直接返回原始字节，避免空指针（转发场景可能在 DKIM 初始化前触发）
+	if instance == nil {
+		return b.Bytes()
+	}
 
 	// dkim 签名后返回
 	return instance.Sign(b.String())
